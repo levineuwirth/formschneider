@@ -31,9 +31,8 @@ jobs:
           path: site
           sparse-checkout: static/initials
       - run: echo "FORMSCHNEIDER_SITE_SET=$GITHUB_WORKSPACE/site/static/initials/eb-garamond" >> "$GITHUB_ENV"
-      - uses: astral-sh/setup-uv@v10
-        with:
-          enable-cache: true
-          cache-dependency-glob: pyproject.toml
+      # setup-uv publishes exact versions only; PyPI's uv is always the current one
+      - name: uv
+        run: pipx install uv
       - name: Tests
         run: make test
