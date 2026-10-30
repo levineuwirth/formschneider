@@ -12,8 +12,9 @@ Read `README.md` first. The plan of record is
 - **Requests cost money and are the author's to start.** `bin/generate`
   plans by default; never pass `--go`, or send any other paid request,
   without the author's go-ahead in the session.
-- **Keys stay in `.env`**, which git ignores. No key, request header or
-  account identifier goes into a committed file or a result.
+- **Keys stay in `.env`**, which git ignores. No key or account
+  identifier goes into a committed file or a result. A request id names
+  one request and nothing else, and the record keeps it.
 - **The site's format is a contract.** `lib/initial.py` writes what
   levineuwirth.org's `MARKS.md` §2.6 describes; `tests/test_cut.py` holds it
   to the site's EB Garamond set byte for byte. Change both together.
