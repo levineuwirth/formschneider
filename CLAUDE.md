@@ -9,6 +9,9 @@ Read `README.md` first. The plan of record is
   its model, version, date, prompt, seed, mask, cost and terms, and a
   keep-or-reject call once the author makes one. The write-up is public and
   cannot be reconstructed after the fact.
+- **Requests cost money and are the author's to start.** `bin/generate`
+  plans by default; never pass `--go`, or send any other paid request,
+  without the author's go-ahead in the session.
 - **Keys stay in `.env`**, which git ignores. No key, request header or
   account identifier goes into a committed file or a result.
 - **The site's format is a contract.** `lib/initial.py` writes what

@@ -71,6 +71,31 @@ times, and hatching (116,000 to 134,000) at 10 to 22 times. The budget is
 therefore a limit on how much edge an initial may have, and it can be
 measured on a picture before anything is traced.
 
+## Generating
+
+A run is a directory under `runs/`: `spec.toml` says what is asked of
+which models (letters, attempts, routes, sizes, prompts, references, the
+kept letter), and `records.jsonl` gets one line per request as it
+returns. Each line records what was sent (the prompt, the settings, and a
+checksum of every input), what came back (the request id, usage, and the
+picture's checksum), the provider's terms, and when. Both files are in
+git. The pictures and everything made from them go to `out/runs/NAME/`.
+
+- **Ornament only:** Spectral SemiBold's capital is set in its block on a
+  canvas of the provider's size, and the model may draw everywhere but the
+  letter and a thin halo around it. Some providers honor a mask only
+  loosely, so the letter and halo are put back from the canvas afterwards.
+- **References:** EB Garamond Initials' D, G, L, N, Q and T, none of the
+  trial's letters, so no reference can be copied.
+- **Finishing:** every picture gets the same fixed finishing, the setting
+  fixed on the scans before any generated picture was seen.
+
+```sh
+bin/generate pilot-openai        # plan only: what would be sent, and its inputs in out/
+bin/generate pilot-openai --go   # send it (keys from .env), stopping at the first error
+bin/finish pilot-openai          # put back, cut, measure: out/runs/pilot-openai/finished/
+```
+
 ## Running
 
 Python 3.12 or later through [uv](https://docs.astral.sh/uv/), with
@@ -85,6 +110,7 @@ make test        # the cut against known outlines
 make calibrate   # out/calibrate/: results.md, results.json, sheet.png, svg/
 bin/corpus fetch # the scans corpus/scans.json records, into out/corpus/
 make scans       # out/scans/: the same, for the scans
+uv run --extra openai bin/generate NAME   # see Generating
 ```
 
 ## CI

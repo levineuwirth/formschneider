@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Make a run's requests. runs/NAME/spec.toml says what is asked of whom;
+runs/NAME/records.jsonl records each request as it returns.
+
+Without --go it only plans: the requests still to make, roughly what they
+would cost by the spec's estimates, and every input (canvases, where the
+model may draw, references) written to out/runs/NAME/inputs/ to look at
+first. With --go it reads the keys from .env and sends them, stopping at
+the first error, which is recorded too.
+
+Usage: uv run --extra openai bin/generate NAME [--go] [--limit N]
+"""
+
+import argparse
+import sys
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+import env
+import run
+
+
+def openai_images(model, **params):
+    from openai_images import OpenAIImages
+    return OpenAIImages(model, **params)
+
+
+ADAPTERS = {"openai": openai_images}
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("name")
+    ap.add_argument("--go", action="store_true", help="send the requests; without it, only plan")
+    ap.add_argument("--limit", type=int)
+    a = ap.parse_args()
+    if a.go:
+        print("keys from .env:", ", ".join(env.load(ROOT / ".env")) or "none")
+    run.execute(run.load(a.name), ADAPTERS, go=a.go, limit=a.limit)
+
+
+if __name__ == "__main__":
+    main()

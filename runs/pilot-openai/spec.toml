@@ -1,0 +1,49 @@
+# The OpenAI pilot: one model, both routes, the trial's six letters, four
+# attempts each, to shake out prompts, masks and the finishing before the
+# matched run. Nothing here is a result; prompts and settings may change
+# between pilots, and each pilot is its own run.
+
+letters = "AFIOSW"
+attempts = 4
+routes = ["whole", "ornament"]
+idiom = "rinceau"
+max_requests = 60           # every request ever recorded for this run, ok or not
+
+[letter]                    # the kept capital, for the ornament-only route
+weight = "SemiBold"         # Spectral's, as the site serves it; chosen 2026-10-30
+cap = 0.82                  # cap height, as a share of the block (EB Garamond Initials' ≈ 0.82)
+grow = 10                   # the white halo kept around the letter, in units (the block is 1000 tall)
+
+[refs]                      # style references: EB Garamond Initials' letters,
+letters = "DGLNQT"          # none of the trial's six, so none can be copied (X has no ornament)
+
+[[model]]
+provider = "openai"
+model = "gpt-image-2.5-sunburst"
+sizes = [[1024, 1024], [1536, 1024]]   # each letter gets the one nearest its block's shape
+params = { quality = "high" }
+# per request, a guess: $0.053 for the image at 1024² high (survey of
+# 2026-10-30) and about as much again for six references as input. The
+# usage in each record is the truth.
+est_usd = 0.12
+terms = "OpenAI Services Agreement: the customer owns the output (openai.com/policies/services-agreement)."
+
+[prompt]
+whole = """\
+A woodcut ornamental initial as printed in France in the sixteenth century: \
+the capital letter {letter}, large and centered in a square block, among vine \
+scrolls (rinceau) of curling stems, leaves and small flowers, cut as solid \
+black shapes on an open white ground. Black ink on white only: the ground is \
+white, never black. No frame or border. No other letters or words anywhere. \
+Crisp, flat black edges: no paper texture, no shading, no hatching, no gray. \
+The reference images show the style to follow; take their ornament, not \
+their letters."""
+ornament = """\
+The first image is a woodcut ornamental initial in which only the capital \
+letter {letter} has been cut. Fill the empty white space around the letter \
+with vine scrolls (rinceau) of curling stems, leaves and small flowers, cut \
+as solid black shapes on an open white ground and filling the square block \
+evenly, in the style of the other images. Leave the letter exactly as it is, \
+with a thin white gap around it. Draw no letters, words or frame. Black ink \
+on white only, crisp flat edges: no paper texture, no shading, no hatching, \
+no gray."""

@@ -41,6 +41,7 @@ sys.path.insert(0, str(ROOT / "lib"))
 from PIL import Image
 
 from bench import contact, table
+from finish import BUDGET, FINISH, threshold
 from initial import initial_svg, measure
 from prepare import Prep, box_for, otsu, prepare
 from raster import bare_svg, deviation, edge, iou, rasterize
@@ -48,19 +49,13 @@ from simplify import simplify
 from trace import Cut, trace
 
 EVAL = 1000
-BUDGET = 17996  # EB Garamond Initials' F, the home page's: path data in bytes
 PREPS = dict(width=(None, 2048), median=(0, 3))
 CUTS = dict(speck=(2, 20, 100), tolerance=(0, 1, 2, 3))
-BLIND = dict(width=2048, median=3, speck=20, tolerance=2)
+BLIND = FINISH  # the trial's fixed finishing (lib/finish.py)
 
 
 def scan_file(scan: dict) -> File:
     return next((ROOT / "out" / "corpus").glob(scan["id"] + ".*"))
-
-
-def threshold(gray: Image.Image) -> Image.Image:
-    t = otsu(gray) * 255
-    return gray.point(lambda v: 0 if v < t else 255)
 
 
 def reference(scan: dict) -> Image.Image:

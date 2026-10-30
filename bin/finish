@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Finish what a run has made: each picture checked against its record, the
+letter put back (ornament route), cropped to its block, cut with the
+trial's fixed finishing, written as the site would hold it, and measured.
+
+Writes out/runs/NAME/finished/: ID.svg, measures.json, sheet.png.
+
+Usage: finish NAME
+"""
+
+import sys
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+import run
+from bench import table
+
+
+def main() -> None:
+    rows = run.finish(run.load(sys.argv[1]))
+    print(table(rows, [("id", "{id}"), ("path KB", "{path_bytes:,}"), ("× budget", "{budget:.2f}"),
+                       ("edge", "{edge:,}"), ("B/edge", "{per_edge:.2f}"),
+                       ("strays", "{strays:.1f}"), ("lost", "{lost:.1f}")]))
+
+
+if __name__ == "__main__":
+    main()
