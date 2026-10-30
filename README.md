@@ -84,6 +84,13 @@ bin/corpus fetch # the scans corpus/scans.json records, into out/corpus/
 make scans       # out/scans/: the same, for the scans
 ```
 
+## CI
+
+GitHub runs `make test` on every push (`.github/workflows/tests.yml`), with
+EB Garamond Initials from CTAN, checked against the copy the site's set was
+cut from, and the set itself from levineuwirth.org's repository. A test
+that skips there fails the run.
+
 ## License
 
 The code is MIT (`LICENSE`). Fonts are not copied into the repository.

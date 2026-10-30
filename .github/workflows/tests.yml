@@ -1,0 +1,39 @@
+# The cut against known outlines (make test). It needs potrace and rsvg-convert
+# from the system, EB Garamond Initials, and levineuwirth.org's set of it, and
+# fails if any test skips for want of one (tests/conftest.py).
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: potrace, rsvg-convert
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends potrace librsvg2-bin
+      # The file the site's set was cut from (TeX Live's copy, from CTAN); the
+      # checksum holds the identity test to that font and no other.
+      - name: EB Garamond Initials
+        run: |
+          f="$RUNNER_TEMP/EBGaramond-Initials.otf"
+          curl -fsSL -o "$f" https://mirrors.ctan.org/fonts/ebgaramond/opentype/EBGaramond-Initials.otf
+          echo "1e9551053aeb040d1562565ae0d0c47b2f1410b517626ccd3bde0efbd7bae6a8  $f" | sha256sum -c
+          echo "FORMSCHNEIDER_EBGI=$f" >> "$GITHUB_ENV"
+      - name: levineuwirth.org's EB Garamond set
+        uses: actions/checkout@v4
+        with:
+          repository: levineuwirth/levineuwirth.org
+          path: site
+          sparse-checkout: static/initials
+      - run: echo "FORMSCHNEIDER_SITE_SET=$GITHUB_WORKSPACE/site/static/initials/eb-garamond" >> "$GITHUB_ENV"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - name: Tests
+        run: make test
