@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""Try the cut on real woodcut initials, the noisy pictures that calibrate
+cannot give it.
+
+Each scan in corpus/scans.json is prepared several ways (its own width or
+2048 px, with or without a median filter, its light leveled when it is a
+photographed page), thresholded where its gray levels split best (Otsu),
+traced, and refit with fewer curves at several tolerances (lib/simplify.py).
+Speckle size and tolerance are in units of the initial's box, a thousand
+along its long side, so they mean the same at every width.
+
+Each trace is scored on cost and on fidelity to the scan as prepared
+plainly and thresholded at 1000 px. Fidelity is measured two ways: IoU, and
+deviation, the 95th percentile of distance from the trace's outline to the
+scan's and from the scan's to the trace's (what it lost), in box units. An
+initial is shown at most some 230 device pixels tall, about four units to a
+pixel, so a deviation of 2 is under half a pixel there. Cost splits into
+the scan's edge (its outline's length in units, a fact of the design) times
+bytes per unit of edge (a fact of the cut). EB Garamond Initials' F, drawn
+by hand, spends 0.62 bytes per unit.
+
+Three traces are picked per scan: the cheapest within --deviation, the
+most faithful by IoU, and the one made with BLIND, the fixed finishing a
+trial would apply to every picture without looking.
+
+Writes out/scans/: results.json, results.md, sheet.png (scan, its ink,
+then the three picks), svg/.
+
+Usage: scans [--only ID,…] [--deviation 2] [--jobs 4] [--out DIR]
+"""
+
+import argparse
+import itertools
+import json
+import sys
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+from PIL import Image
+
+from bench import contact, table
+from initial import initial_svg, measure
+from prepare import Prep, box_for, otsu, prepare
+from raster import bare_svg, deviation, edge, iou, rasterize
+from simplify import simplify
+from trace import Cut, trace
+
+EVAL = 1000
+BUDGET = 17996  # EB Garamond Initials' F, the home page's: path data in bytes
+PREPS = dict(width=(None, 2048), median=(0, 3))
+CUTS = dict(speck=(2, 20, 100), tolerance=(0, 1, 2, 3))
+BLIND = dict(width=2048, median=3, speck=20, tolerance=2)
+
+
+def scan_file(scan: dict) -> File:
+    return next((ROOT / "out" / "corpus").glob(scan["id"] + ".*"))
+
+
+def threshold(gray: Image.Image) -> Image.Image:
+    t = otsu(gray) * 255
+    return gray.point(lambda v: 0 if v < t else 255)
+
+
+def reference(scan: dict) -> Image.Image:
+    src = Image.open(scan_file(scan))
+    return prepare(src, Prep(width=EVAL, level=scan.get("light") == "uneven"), scan["crop"])
+
+
+def run(scan: dict, width, median) -> list[dict]:
+    """Every cut of one scan, prepared one way."""
+    level = scan.get("light") == "uneven"
+    ref = threshold(reference(scan))
+    scan_edge = int(edge(ref).sum())
+    pic = prepare(Image.open(scan_file(scan)), Prep(width=width, median=median, level=level),
+                  scan["crop"])
+    box = box_for(pic.size)
+    px = max(pic.size) / 1000
+    rows = []
+    for speck in CUTS["speck"]:
+        cut = Cut(threshold=otsu(pic), turdsize=round(speck * px * px))
+        traced = trace(pic, box, cut)
+        for tolerance in CUTS["tolerance"]:
+            path = simplify(traced, tolerance) if tolerance else traced
+            svg = initial_svg(path, box, credit(
+                scan, f"Prepared {Prep(width, median, level)}; {cut}; refit within {tolerance}."))
+            m = measure(path, svg)
+            drawn = rasterize(bare_svg(path, box), ref.width)
+            strays, lost = deviation(ref, drawn)
+            knobs = dict(width=width, median=median, speck=speck, tolerance=tolerance)
+            rows.append({"id": scan["id"], "idiom": scan["idiom"], "px": max(pic.size), **knobs,
+                         **m, "path_kb": m["path_bytes"] / 1000, "br_kb": m["br_bytes"] / 1000,
+                         "budget": m["path_bytes"] / BUDGET, "edge": scan_edge,
+                         "per_edge": m["path_bytes"] / scan_edge,
+                         "iou": round(iou(ref, drawn), 4), "strays": strays, "lost": lost,
+                         "blind": knobs == BLIND, "svg": svg, "bare": bare_svg(path, box)})
+    return rows
+
+
+def credit(scan: dict, how: str) -> str:
+    return (f"{scan['letter']} traced from {scan['title']} ({scan['page']}), "
+            f"{scan['license']}. {how}").replace("--", "–")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only")
+    ap.add_argument("--deviation", type=float, default=2.0)
+    ap.add_argument("--jobs", type=int, default=4)
+    ap.add_argument("--out", type=File, default=ROOT / "out" / "scans")
+    a = ap.parse_args()
+    scans = json.loads((ROOT / "corpus" / "scans.json").read_text())
+    if a.only:
+        scans = [s for s in scans if s["id"] in a.only.split(",")]
+    (a.out / "svg").mkdir(parents=True, exist_ok=True)
+
+    jobs = [(s, w, m) for s in scans for w, m in itertools.product(*PREPS.values())]
+    with ProcessPoolExecutor(a.jobs) as ex:
+        rows = [r for rs in ex.map(run, *zip(*jobs)) for r in rs]
+
+    picked, sheet = [], []
+    for s in scans:
+        mine = [r for r in rows if r["id"] == s["id"]]
+        kept = [r for r in mine if max(r["strays"], r["lost"]) <= a.deviation]
+        picks = {"blind": next(r for r in mine if r["blind"]),
+                 "cheapest": min(kept, key=lambda r: r["path_bytes"]) if kept else None,
+                 "faithful": max(mine, key=lambda r: r["iou"])}
+        src = reference(s)
+        cells = [(f"{s['id']} ({s['idiom']})", src), ("its ink", threshold(src))]
+        for tag, r in picks.items():
+            if r is None:
+                continue
+            picked.append({**r, "pick": tag})
+            (a.out / "svg" / f"{s['id']}-{tag}.svg").write_text(r["svg"])
+            cells.append((f"{tag}: {r['path_kb']:.1f} KB, dev {max(r['strays'], r['lost']):.1f}",
+                          rasterize(r["bare"], EVAL)))
+        sheet.append((s["id"], cells))
+
+    for r in rows:
+        del r["svg"], r["bare"]
+    (a.out / "results.json").write_text(json.dumps(rows, indent=1))
+    report = (f"Per scan: the fixed finishing (blind: {BLIND}), the cheapest trace whose "
+              f"deviation both ways is within {a.deviation} units, and the most faithful by "
+              f"IoU. Budget is the path data of EB Garamond Initials' F "
+              f"({BUDGET / 1000:.1f} KB, 0.62 B per unit of edge).\n\n" + table(picked, [
+                  ("scan", "{id}"), ("idiom", "{idiom}"), ("pick", "{pick}"),
+                  ("px", "{px}"), ("median", "{median}"), ("speck", "{speck}"),
+                  ("tol", "{tolerance}"), ("subpaths", "{subpaths}"),
+                  ("path KB", "{path_kb:.1f}"), ("br KB", "{br_kb:.1f}"),
+                  ("× budget", "{budget:.2f}"), ("edge", "{edge:,}"),
+                  ("B/edge", "{per_edge:.2f}"), ("strays", "{strays:.1f}"),
+                  ("lost", "{lost:.1f}"), ("IoU", "{iou:.3f}")]))
+    (a.out / "results.md").write_text(report)
+    contact(sheet, cell=240).save(a.out / "sheet.png")
+    print(report)
+
+
+if __name__ == "__main__":
+    main()

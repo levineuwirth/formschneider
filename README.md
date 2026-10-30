@@ -42,8 +42,34 @@ settings. Each trace is scored on what it costs and on how much of the
 original's ink it keeps (IoU at 1000 px). A clean picture of 1024 px or
 more traces back at 1.0–1.2 times the original's path data with an IoU
 of 0.98 (the F, with the finest vines, needs 2048 px). So the budget can
-be met when the cut is given a clean picture; what is left to find out
-is what the models give it.
+be met when the cut is given a clean picture.
+
+## Scans
+
+`make scans` tries the cut on real woodcut initials: nine scans from
+Wikimedia Commons, recorded with their sources and licenses in
+`corpus/scans.json` (`bin/corpus` adds and fetches them). They cover
+rinceau at low resolution and in photographs of a page, criblé, dense
+hatching and a black ground.
+
+Traced as they are, real scans cost 4 to 60 times the budget. Most of
+that is the wobble of a printed edge, which potrace follows faithfully.
+So the cut refits each contour with fewer curves within a tolerance
+(`lib/simplify.py`). Fidelity is measured as deviation, the 95th
+percentile of distance between the trace's outline and the scan's in
+both directions, in units of a thousand along the initial's long side.
+An initial is shown at most about 230 device pixels tall, so 2 units is
+under half a pixel.
+
+Cost is then the scan's edge length, a fact of the design, times bytes
+per unit of edge, a fact of the cut. With a refit within 2 units, the
+cut spends 0.6 to 1.2 bytes per unit on rinceau. EB Garamond Initials' F,
+drawn by hand, spends 0.62. What remains is edge length. The F has about
+29,000 units of edge. The rinceau scans run from 33,000 to 80,000 and come
+in at 1.1 to 5.5 times the budget. Criblé (94,000) comes in at 6 to 10
+times, and hatching (116,000 to 134,000) at 10 to 22 times. The budget is
+therefore a limit on how much edge an initial may have, and it can be
+measured on a picture before anything is traced.
 
 ## Running
 
@@ -54,6 +80,8 @@ Python 3.12 or later through [uv](https://docs.astral.sh/uv/), with
 ```sh
 make test        # the cut against known outlines
 make calibrate   # out/calibrate/: results.md, results.json, sheet.png, svg/
+bin/corpus fetch # the scans corpus/scans.json records, into out/corpus/
+make scans       # out/scans/: the same, for the scans
 ```
 
 ## License

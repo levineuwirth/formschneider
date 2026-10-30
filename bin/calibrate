@@ -25,8 +25,8 @@ from pathlib import Path as File
 
 ROOT = File(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lib"))
-from PIL import Image, ImageDraw, ImageFont
 
+from bench import contact
 from glyph import glyph
 from initial import initial_svg, measure
 from raster import bare_svg, iou, rasterize
@@ -106,21 +106,6 @@ def report(rows: list[dict], floor: float) -> str:
                        sb=r["svg_bytes"] / 1000, gb=r["br_bytes"] / 1000,
                        x=r["path_bytes"] / font[r["letter"]], **r))
     return "\n".join(out) + "\n"
-
-
-def contact(sheet) -> Image.Image:
-    cell, pad, label = 300, 12, 34
-    cols = max(len(p) for _, p in sheet)
-    img = Image.new("L", (cols * (cell + pad) + pad, len(sheet) * (cell + label + pad) + pad), 255)
-    draw, font = ImageDraw.Draw(img), ImageFont.load_default(size=14)
-    for r, (_, picks) in enumerate(sheet):
-        for k, (caption, pic) in enumerate(picks):
-            x, y = pad + k * (cell + pad), pad + r * (cell + label + pad)
-            pic = pic.copy()
-            pic.thumbnail((cell, cell))
-            img.paste(pic, (x, y))
-            draw.text((x, y + cell + 6), caption, fill=0, font=font)
-    return img
 
 
 if __name__ == "__main__":

@@ -1,0 +1,203 @@
+[
+ {
+  "id": "bishops-A04",
+  "title": "File:A-04woodcut initial DSC1005.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:A-04woodcut_initial_DSC1005.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/6/67/A-04woodcut_initial_DSC1005.jpg",
+  "size": [
+   3976,
+   3798
+  ],
+  "sha1": "ee1c11edad5f8f0ad373ba349742fc670581409c",
+  "license": "CC BY-SA 4.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "artist": "ChrisInMilton",
+  "credit": "Own work",
+  "date": "2022-05-04 13:53:28",
+  "fetched": "2026-10-30",
+  "letter": "A",
+  "idiom": "rinceau",
+  "crop": [
+   373,
+   109,
+   3121,
+   2843
+  ],
+  "note": "photograph of a page; crop to the block",
+  "light": "uneven"
+ },
+ {
+  "id": "bishops-A07",
+  "title": "File:A-07 woodcut initial DSC0343.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:A-07_woodcut_initial_DSC0343.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/f/fc/A-07_woodcut_initial_DSC0343.jpg",
+  "size": [
+   3801,
+   4571
+  ],
+  "sha1": "4fef367f3b052e2c5c9bab79c4e1507779a7518e",
+  "license": "CC BY-SA 4.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "artist": "ChrisInMilton",
+  "credit": "Own work",
+  "date": "2022-04-29 13:53:53",
+  "fetched": "2026-10-30",
+  "letter": "A",
+  "idiom": "rinceau",
+  "crop": [
+   103,
+   91,
+   3686,
+   3840
+  ],
+  "note": "photograph of a page; crop to the block",
+  "light": "uneven"
+ },
+ {
+  "id": "lacma-I",
+  "title": "File:Fourteen Ornamental Letters (C, D, I, Q) LACMA 53.31.2.1a-n (9 of 14).jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Fourteen_Ornamental_Letters_(C,_D,_I,_Q)_LACMA_53.31.2.1a-n_(9_of_14).jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/b/bb/Fourteen_Ornamental_Letters_%28C%2C_D%2C_I%2C_Q%29_LACMA_53.31.2.1a-n_%289_of_14%29.jpg",
+  "size": [
+   2093,
+   2100
+  ],
+  "sha1": "518e039f9c9fa1c0417a6aa5dd83747c62e79fff",
+  "license": "Public domain",
+  "license_url": null,
+  "artist": null,
+  "credit": "Image: http://collections.lacma.org/sites/default/files/remote_images/piction/ma-2445440-O3.jpg Gallery: http://collections.lacma.org/node/203987 archive copy at the Wayback Machine",
+  "date": "16 th century date QS:P571,+1550-00-00T00:00:00Z/7",
+  "fetched": "2026-10-30",
+  "letter": "I",
+  "idiom": "hatched",
+  "crop": null,
+  "note": "dense hatching, figures"
+ },
+ {
+  "id": "lacma-R",
+  "title": "File:Seventeen Ornamental Letters (I, M, N, R, S) LACMA 53.31.2.5a-q (10 of 17).jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Seventeen_Ornamental_Letters_(I,_M,_N,_R,_S)_LACMA_53.31.2.5a-q_(10_of_17).jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/d/d7/Seventeen_Ornamental_Letters_%28I%2C_M%2C_N%2C_R%2C_S%29_LACMA_53.31.2.5a-q_%2810_of_17%29.jpg",
+  "size": [
+   1815,
+   2100
+  ],
+  "sha1": "ce7998aad78b7b06cc31be3f67c6afc44fadfe21",
+  "license": "Public domain",
+  "license_url": null,
+  "artist": null,
+  "credit": "Image: http://collections.lacma.org/sites/default/files/remote_images/piction/ma-2445536-O3.jpg Gallery: http://collections.lacma.org/node/204039 archive copy at the Wayback Machine",
+  "date": "between 1620 and 1621 date QS:P571,+1620-00-00T00:00:00Z/8,P1319,+1620-00-00T00:00:00Z/9,P1326,+1621-00-00T00:00:00Z/9",
+  "fetched": "2026-10-30",
+  "letter": "R",
+  "idiom": "hatched",
+  "crop": null,
+  "note": "light impression"
+ },
+ {
+  "id": "rabelais-A",
+  "title": "File:Rabelais marty-laveaux lettrine A.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Rabelais_marty-laveaux_lettrine_A.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/7/7e/Rabelais_marty-laveaux_lettrine_A.jpg",
+  "size": [
+   312,
+   312
+  ],
+  "sha1": "a6531ca88cef29c1e1b54a84fa00304c51ccdcee",
+  "license": "Public domain",
+  "license_url": null,
+  "artist": "Unknown author Unknown author",
+  "credit": "File:Rabelais_marty-laveaux_01.djvu",
+  "date": "01.01.1866",
+  "fetched": "2026-10-30",
+  "letter": "A",
+  "idiom": "rinceau",
+  "crop": null,
+  "note": "Marty-Laveaux's Rabelais (19th c.), after 16th-c. lettrines; low resolution"
+ },
+ {
+  "id": "rabelais-F",
+  "title": "File:Rabelais marty-laveaux lettrine F.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Rabelais_marty-laveaux_lettrine_F.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/2/27/Rabelais_marty-laveaux_lettrine_F.jpg",
+  "size": [
+   311,
+   311
+  ],
+  "sha1": "4c16d890173b66fbada2f2410a512baf3a695630",
+  "license": "Public domain",
+  "license_url": null,
+  "artist": "Unknown author Unknown author",
+  "credit": "File:Rabelais_marty-laveaux_01.djvu",
+  "date": "01.01.1866",
+  "fetched": "2026-10-30",
+  "letter": "F",
+  "idiom": "rinceau",
+  "crop": null,
+  "note": "beside EB Garamond Initials' F"
+ },
+ {
+  "id": "sacchetti-B",
+  "title": "File:Postuma Sacchetti 27.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Postuma_Sacchetti_27.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/b/bb/Postuma_Sacchetti_27.jpg",
+  "size": [
+   519,
+   480
+  ],
+  "sha1": "b775bcf73dce5610968afb9661f74deb83d653d0",
+  "license": "Public domain",
+  "license_url": null,
+  "artist": "Zanichelli editore;",
+  "credit": "Sito internet LiberLiber",
+  "date": "2013-05-15 16:12:14",
+  "fetched": "2026-10-30",
+  "letter": "B",
+  "idiom": "black-ground",
+  "crop": null,
+  "note": "low resolution, blurred"
+ },
+ {
+  "id": "spenser-A",
+  "title": "File:The Shepheardes Calender - Spenser (1579) - initial A.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:The_Shepheardes_Calender_-_Spenser_(1579)_-_initial_A.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/4/43/The_Shepheardes_Calender_-_Spenser_%281579%29_-_initial_A.jpg",
+  "size": [
+   744,
+   769
+  ],
+  "sha1": "8ddbc9c0bede5706c912042bced6747b169054e7",
+  "license": "Public domain",
+  "license_url": null,
+  "artist": "Artist unknown Hugh Singleton (printer) Edmund Spenser (author)",
+  "credit": "https://luna.folger.edu/luna/servlet/view/search?q=Call_Number=%22STC%2023089%22&sort=Call_Number,MPSORTORDER1,CD_Title,Imprint&os=0",
+  "date": "1579",
+  "fetched": "2026-10-30",
+  "letter": "A",
+  "idiom": "criblé",
+  "crop": null,
+  "note": null
+ },
+ {
+  "id": "spenser-T",
+  "title": "File:The Shepheardes Calender - Spenser (1579) - initial T.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:The_Shepheardes_Calender_-_Spenser_(1579)_-_initial_T.jpg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/The_Shepheardes_Calender_-_Spenser_%281579%29_-_initial_T.jpg",
+  "size": [
+   577,
+   639
+  ],
+  "sha1": "8a61ff3139a0bce5a5dfcb52eb0359da064536d5",
+  "license": "Public domain",
+  "license_url": null,
+  "artist": "Artist unknown Hugh Singleton (printer) Edmund Spenser (author)",
+  "credit": "https://luna.folger.edu/luna/servlet/view/search?q=Call_Number=%22STC%2023089%22&sort=Call_Number,MPSORTORDER1,CD_Title,Imprint&os=0",
+  "date": "1579",
+  "fetched": "2026-10-30",
+  "letter": "T",
+  "idiom": "rinceau",
+  "crop": null,
+  "note": null
+ }
+]

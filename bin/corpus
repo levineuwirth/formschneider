@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""The scans the cut is tried on, with where each came from and on what terms.
+
+corpus/scans.json is the record, kept in git: for each scan its Wikimedia
+Commons file, the original's URL and checksum, license, artist and credit
+as Commons states them, the letter, its idiom, a crop to the initial when
+the picture holds more than the initial, and whether its light is uneven
+(a photographed page, which the cut levels first). The pictures themselves go
+to out/corpus/, outside git, and `fetch` restores them from the record.
+
+Usage: corpus add ID "File:…" --letter A --idiom rinceau [--crop x0,y0,x1,y1] [--light uneven] [--note …]
+       corpus fetch
+"""
+
+import argparse
+import datetime
+import hashlib
+import html
+import json
+import re
+import sys
+import urllib.parse
+import urllib.request
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+RECORD = ROOT / "corpus" / "scans.json"
+FILES = ROOT / "out" / "corpus"
+UA = "formschneider/0 (https://github.com/levineuwirth/formschneider)"
+API = "https://commons.wikimedia.org/w/api.php"
+IDIOMS = ("rinceau", "criblé", "hatched", "black-ground", "historiated")
+
+
+def get(url: str, **q) -> bytes:
+    if q:
+        url += "?" + urllib.parse.urlencode(q)
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return r.read()
+
+
+def plain(v) -> str:
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", str(v))).split())
+
+
+def load() -> list[dict]:
+    return json.loads(RECORD.read_text()) if RECORD.exists() else []
+
+
+def save(scans: list[dict]) -> None:
+    RECORD.parent.mkdir(exist_ok=True)
+    RECORD.write_text(json.dumps(sorted(scans, key=lambda s: s["id"]),
+                                 indent=1, ensure_ascii=False) + "\n")
+
+
+def file_for(scan: dict) -> File:
+    return FILES / (scan["id"] + File(urllib.parse.urlsplit(scan["url"]).path).suffix.lower())
+
+
+def add(a) -> None:
+    scans = [s for s in load() if s["id"] != a.id]
+    q = json.loads(get(API, action="query", format="json", titles=a.title, prop="imageinfo",
+                       iiprop="url|size|sha1|extmetadata"))
+    page = next(iter(q["query"]["pages"].values()))
+    if "imageinfo" not in page:
+        sys.exit(f"no such file on Commons: {a.title}")
+    ii = page["imageinfo"][0]
+    meta = {k: plain(v["value"]) for k, v in ii.get("extmetadata", {}).items()}
+    data = get(ii["url"])
+    if hashlib.sha1(data).hexdigest() != ii["sha1"]:
+        sys.exit(f"checksum differs from Commons' for {a.title}")
+    scan = {
+        "id": a.id, "title": page["title"], "page": ii["descriptionurl"],
+        "url": urllib.parse.urlsplit(ii["url"])._replace(query="").geturl(),
+        "size": [ii["width"], ii["height"]], "sha1": ii["sha1"],
+        "license": meta.get("LicenseShortName"), "license_url": meta.get("LicenseUrl"),
+        "artist": meta.get("Artist"), "credit": meta.get("Credit"),
+        "date": meta.get("DateTimeOriginal"),
+        "fetched": datetime.date.today().isoformat(),
+        "letter": a.letter, "idiom": a.idiom,
+        "crop": [int(v) for v in a.crop.split(",")] if a.crop else None,
+        "light": a.light, "note": a.note,
+    }
+    FILES.mkdir(parents=True, exist_ok=True)
+    file_for(scan).write_bytes(data)
+    save(scans + [scan])
+    print(f"{a.id}: {scan['size'][0]}×{scan['size'][1]}, {scan['license']}")
+
+
+def fetch(_) -> None:
+    FILES.mkdir(parents=True, exist_ok=True)
+    for scan in load():
+        f = file_for(scan)
+        if f.exists() and hashlib.sha1(f.read_bytes()).hexdigest() == scan["sha1"]:
+            continue
+        data = get(scan["url"])
+        if hashlib.sha1(data).hexdigest() != scan["sha1"]:
+            sys.exit(f"{scan['id']}: the file on Commons has changed since it was recorded")
+        f.write_bytes(data)
+        print(f"{scan['id']}: fetched")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(required=True)
+    p = sub.add_parser("add")
+    p.add_argument("id")
+    p.add_argument("title")
+    p.add_argument("--letter", required=True)
+    p.add_argument("--idiom", required=True, choices=IDIOMS)
+    p.add_argument("--crop")
+    p.add_argument("--light", choices=("uneven",), help="a photographed page, to be leveled")
+    p.add_argument("--note")
+    p.set_defaults(run=add)
+    sub.add_parser("fetch").set_defaults(run=fetch)
+    a = ap.parse_args()
+    a.run(a)
+
+
+if __name__ == "__main__":
+    main()

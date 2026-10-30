@@ -6,6 +6,7 @@ import subprocess
 
 import numpy as np
 from PIL import Image
+from scipy.ndimage import distance_transform_edt
 
 from paths import Path, fmt
 
@@ -42,3 +43,23 @@ def iou(a: Image.Image, b: Image.Image) -> float:
     x, y = ink(a), ink(b)
     union = (x | y).sum()
     return float((x & y).sum() / union) if union else 1.0
+
+
+def edge(img: Image.Image) -> np.ndarray:
+    """Ink pixels with ground beside them: the outline, a pixel wide."""
+    a = ink(img)
+    p = np.pad(a, 1)
+    return a & ~(p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:])
+
+
+def deviation(a: Image.Image, b: Image.Image, q: float = 95) -> tuple[float, float]:
+    """How far b's outline strays from a's, and how far a's lies from b's
+    (what b lost), each as the q-th percentile of distance, in a's pixels.
+    Unlike IoU, a shift of a pixel counts as a pixel however thin the stroke."""
+    if a.size != b.size:
+        b = b.resize(a.size, Image.Resampling.LANCZOS)
+    ea, eb = edge(a), edge(b)
+    if not ea.any() or not eb.any():
+        return float("inf"), float("inf")
+    return (float(np.percentile(distance_transform_edt(~ea)[eb], q)),
+            float(np.percentile(distance_transform_edt(~eb)[ea], q)))
