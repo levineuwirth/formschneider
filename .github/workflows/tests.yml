@@ -1,6 +1,6 @@
-# The cut against known outlines (make test). It needs potrace and rsvg-convert
-# from the system, EB Garamond Initials, and levineuwirth.org's set of it, and
-# fails if any test skips for want of one (tests/conftest.py).
+# make test. It needs potrace and rsvg-convert from the system, the fonts
+# fonts.json lists, and levineuwirth.org's EB Garamond set, and fails if any
+# test skips for want of one (tests/conftest.py).
 name: tests
 
 on:
@@ -16,14 +16,6 @@ jobs:
       - uses: actions/checkout@v7
       - name: potrace, rsvg-convert
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends potrace librsvg2-bin
-      # The file the site's set was cut from (TeX Live's copy, from CTAN); the
-      # checksum holds the identity test to that font and no other.
-      - name: EB Garamond Initials
-        run: |
-          f="$RUNNER_TEMP/EBGaramond-Initials.otf"
-          curl -fsSL -o "$f" https://mirrors.ctan.org/fonts/ebgaramond/opentype/EBGaramond-Initials.otf
-          echo "1e9551053aeb040d1562565ae0d0c47b2f1410b517626ccd3bde0efbd7bae6a8  $f" | sha256sum -c
-          echo "FORMSCHNEIDER_EBGI=$f" >> "$GITHUB_ENV"
       - name: levineuwirth.org's EB Garamond set
         uses: actions/checkout@v7
         with:
@@ -34,5 +26,9 @@ jobs:
       # setup-uv publishes exact versions only; PyPI's uv is always the current one
       - name: uv
         run: pipx install uv
+      # EB Garamond Initials from CTAN, Spectral from the Google Fonts revision
+      # the site pins, each checked against fonts.json
+      - name: Fonts
+        run: uv run bin/fonts
       - name: Tests
         run: make test

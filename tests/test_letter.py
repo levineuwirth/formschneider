@@ -7,10 +7,11 @@ from pathlib import Path as File
 import pytest
 
 sys.path.insert(0, str(File(__file__).resolve().parent.parent / "lib"))
-from letter import SPECTRAL, capital
+from fonts import SPECTRAL
+from letter import capital
 
 FONT = SPECTRAL.format(weight="SemiBold")
-pytestmark = pytest.mark.skipif(not File(FONT).exists(), reason="Spectral not found")
+pytestmark = pytest.mark.skipif(not File(FONT).exists(), reason="no Spectral: run bin/fonts")
 
 
 def extent(path):

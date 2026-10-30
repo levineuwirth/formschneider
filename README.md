@@ -74,10 +74,13 @@ measured on a picture before anything is traced.
 ## Running
 
 Python 3.12 or later through [uv](https://docs.astral.sh/uv/), with
-`potrace` and `rsvg-convert` from the system, and EB Garamond Initials
-(TeX Live's path by default; set `FORMSCHNEIDER_EBGI` to override it).
+`potrace` and `rsvg-convert` from the system. The fonts come from the
+sources `fonts.json` records, checked against its checksums: EB Garamond
+Initials from CTAN, and Spectral from the Google Fonts revision
+levineuwirth.org pins, so the kept letter is the one the site sets.
 
 ```sh
+bin/fonts        # the fonts, into out/fonts/
 make test        # the cut against known outlines
 make calibrate   # out/calibrate/: results.md, results.json, sheet.png, svg/
 bin/corpus fetch # the scans corpus/scans.json records, into out/corpus/
@@ -86,10 +89,9 @@ make scans       # out/scans/: the same, for the scans
 
 ## CI
 
-GitHub runs `make test` on every push (`.github/workflows/tests.yml`), with
-EB Garamond Initials from CTAN, checked against the copy the site's set was
-cut from, and the set itself from levineuwirth.org's repository. A test
-that skips there fails the run.
+GitHub runs `make test` on every push (`.github/workflows/tests.yml`),
+with the fonts from `bin/fonts` and the EB Garamond set from
+levineuwirth.org's repository. A test that skips there fails the run.
 
 ## License
 

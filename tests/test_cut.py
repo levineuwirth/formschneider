@@ -9,19 +9,17 @@ from pathlib import Path as File
 import pytest
 
 sys.path.insert(0, str(File(__file__).resolve().parent.parent / "lib"))
+from fonts import EBGI
 from glyph import glyph
 from paths import fmt, parse
 from raster import bare_svg, iou, rasterize
 from trace import trace
 
-EBGI = os.environ.get(
-    "FORMSCHNEIDER_EBGI",
-    "/usr/share/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Initials.otf")
 SET = File(os.environ.get(
     "FORMSCHNEIDER_SITE_SET",
     File.home() / "Repos/personal/levineuwirth.org/static/initials/eb-garamond"))
 
-needs_font = pytest.mark.skipif(not File(EBGI).exists(), reason="EB Garamond Initials not found")
+needs_font = pytest.mark.skipif(not File(EBGI).exists(), reason="no EB Garamond Initials: run bin/fonts")
 
 
 def test_potrace_relative_data_reads_absolute():

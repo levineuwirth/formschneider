@@ -27,12 +27,12 @@ ROOT = File(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lib"))
 
 from bench import contact
+from fonts import EBGI
 from glyph import glyph
 from initial import initial_svg, measure
 from raster import bare_svg, iou, rasterize
 from trace import Cut, trace
 
-EBGI = "/usr/share/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Initials.otf"
 CREDIT = "{c} from EB Garamond Initials, Georg Duffner; SIL Open Font License 1.1. {how}"
 EVAL = 1000
 WIDTHS = (512, 1024, 2048)

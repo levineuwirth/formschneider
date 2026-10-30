@@ -1,0 +1,17 @@
+{
+ "EBGaramond-Initials.otf": {
+  "url": "https://mirrors.ctan.org/fonts/ebgaramond/opentype/EBGaramond-Initials.otf",
+  "sha256": "1e9551053aeb040d1562565ae0d0c47b2f1410b517626ccd3bde0efbd7bae6a8",
+  "note": "TeX Live's copy, which levineuwirth.org's static/initials/eb-garamond was cut from"
+ },
+ "Spectral-SemiBold.ttf": {
+  "url": "https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/spectral/Spectral-SemiBold.ttf",
+  "sha256": "5f86915a744832ecf6e4a17ab04bea091b9fa992ef5164ff65ae34c1da2fe94b",
+  "note": "the revision levineuwirth.org pins in tools/font-sources.json"
+ },
+ "Spectral-Bold.ttf": {
+  "url": "https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/spectral/Spectral-Bold.ttf",
+  "sha256": "70ddb1ec6ae3b0b8d0c79231f670de786978f19baeba2130757526e407aebf9b",
+  "note": "the revision levineuwirth.org pins in tools/font-sources.json"
+ }
+}

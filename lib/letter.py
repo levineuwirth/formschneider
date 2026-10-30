@@ -3,10 +3,9 @@ ornament-only route keeps, which the model is never asked to draw."""
 
 from fontTools.ttLib import TTFont
 
+from fonts import SPECTRAL
 from glyph import bounds, outline
 from paths import Path
-
-SPECTRAL = "/usr/share/texmf-dist/fonts/truetype/production/spectral/Spectral-{weight}.ttf"
 
 
 def capital(font: str, char: str, height: int = 1000, cap: float = 0.82,
