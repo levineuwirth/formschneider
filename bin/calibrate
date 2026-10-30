@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Calibrate the cut on letters whose outlines are known.
+
+EB Garamond Initials' letters are drawn as pictures at several widths and
+traced back, over a grid of potrace's knobs. Each trace is measured two
+ways against the original: what it costs, in the site's own measures, and
+how much of the original's ink it keeps (intersection over union at
+1000 px). If tracing cannot bring a drawn initial back near its own cost,
+no generated picture will do better, and the budget is a limit of the cut,
+not of the models.
+
+Writes out/calibrate/: results.json (every trace), results.md (per letter
+and width, the cheapest trace that keeps --iou of the ink, and the most
+faithful), sheet.png (original beside those traces), svg/ (them, as the
+site would hold them).
+
+Usage: calibrate [--font OTF] [--letters AFO] [--iou 0.98] [--out DIR]
+"""
+
+import argparse
+import itertools
+import json
+import sys
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+from PIL import Image, ImageDraw, ImageFont
+
+from glyph import glyph
+from initial import initial_svg, measure
+from raster import bare_svg, iou, rasterize
+from trace import Cut, trace
+
+EBGI = "/usr/share/texmf-dist/fonts/opentype/public/ebgaramond/EBGaramond-Initials.otf"
+CREDIT = "{c} from EB Garamond Initials, Georg Duffner; SIL Open Font License 1.1. {how}"
+EVAL = 1000
+WIDTHS = (512, 1024, 2048)
+GRID = dict(turdsize=(2, 10, 40), alphamax=(0.8, 1.0, 1.334), opttolerance=(0.2, 0.5, 1.0))
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--font", default=EBGI)
+    ap.add_argument("--letters", default="AFO")
+    ap.add_argument("--iou", type=float, default=0.98)
+    ap.add_argument("--out", type=File, default=ROOT / "out" / "calibrate")
+    a = ap.parse_args()
+    (a.out / "svg").mkdir(parents=True, exist_ok=True)
+
+    rows, sheet = [], []
+    for c in a.letters:
+        ref, box = glyph(a.font, c)
+        ref_svg = initial_svg(ref, box, CREDIT.format(c=c, how="Drawn from the font."))
+        ref_eval = rasterize(bare_svg(ref, box), EVAL)
+        rows.append({"letter": c, "source": "font", **measure(ref, ref_svg), "iou": 1.0})
+        picks = [("font", ref_eval)]
+        for width in WIDTHS:
+            pic = rasterize(bare_svg(ref, box), width)
+            mine = []
+            for knobs in itertools.product(*GRID.values()):
+                cut = Cut(**dict(zip(GRID, knobs)))
+                path = trace(pic, box, cut)
+                svg = initial_svg(path, box, CREDIT.format(
+                    c=c, how=f"Rendered at {width} px and traced: {cut}."))
+                row = {"letter": c, "source": f"trace@{width}", **vars(cut),
+                       **measure(path, svg),
+                       "iou": round(iou(ref_eval, rasterize(bare_svg(path, box), EVAL)), 4)}
+                rows.append(row)
+                mine.append((row, path, svg))
+            kept = [m for m in mine if m[0]["iou"] >= a.iou]
+            for tag, m in (("cheapest", min(kept, key=lambda m: m[0]["path_bytes"]) if kept else None),
+                           ("faithful", max(mine, key=lambda m: m[0]["iou"]))):
+                if m is None:
+                    continue
+                m[0].setdefault("picked", []).append(tag)
+                (a.out / "svg" / f"{c}-{width}-{tag}.svg").write_text(m[2])
+                if tag == "cheapest":
+                    picks.append((f"{width}px, {m[0]['path_bytes'] / 1000:.1f} KB, "
+                                  f"IoU {m[0]['iou']:.3f}",
+                                  rasterize(bare_svg(m[1], box), EVAL)))
+        sheet.append((c, picks))
+        print(c, "done", file=sys.stderr)
+
+    (a.out / "results.json").write_text(json.dumps(rows, indent=1))
+    (a.out / "results.md").write_text(report(rows, a.iou))
+    contact(sheet).save(a.out / "sheet.png")
+    print((a.out / "results.md").read_text())
+
+
+def report(rows: list[dict], floor: float) -> str:
+    out = [f"Cheapest trace keeping IoU >= {floor}, and the most faithful, per width.",
+           "Path KB is the outlines once; the file carries them three times.", "",
+           "| letter | source | pick | turd | alpha | opt | subpaths | commands "
+           "| path KB | svg KB | br KB | IoU | path vs font |",
+           "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    font = {r["letter"]: r["path_bytes"] for r in rows if r["source"] == "font"}
+    for r in rows:
+        if r["source"] != "font" and "picked" not in r:
+            continue
+        out.append("| {letter} | {source} | {pick} | {t} | {a} | {o} | {subpaths} | {commands} "
+                   "| {pb:.1f} | {sb:.1f} | {gb:.1f} | {iou:.3f} | {x:.2f}× |".format(
+                       pick="/".join(r.get("picked", [])) or "–",
+                       t=r.get("turdsize", "–"), a=r.get("alphamax", "–"),
+                       o=r.get("opttolerance", "–"), pb=r["path_bytes"] / 1000,
+                       sb=r["svg_bytes"] / 1000, gb=r["br_bytes"] / 1000,
+                       x=r["path_bytes"] / font[r["letter"]], **r))
+    return "\n".join(out) + "\n"
+
+
+def contact(sheet) -> Image.Image:
+    cell, pad, label = 300, 12, 34
+    cols = max(len(p) for _, p in sheet)
+    img = Image.new("L", (cols * (cell + pad) + pad, len(sheet) * (cell + label + pad) + pad), 255)
+    draw, font = ImageDraw.Draw(img), ImageFont.load_default(size=14)
+    for r, (_, picks) in enumerate(sheet):
+        for k, (caption, pic) in enumerate(picks):
+            x, y = pad + k * (cell + pad), pad + r * (cell + label + pad)
+            pic = pic.copy()
+            pic.thumbnail((cell, cell))
+            img.paste(pic, (x, y))
+            draw.text((x, y + cell + 6), caption, fill=0, font=font)
+    return img
+
+
+if __name__ == "__main__":
+    main()

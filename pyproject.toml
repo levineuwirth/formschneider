@@ -1,0 +1,16 @@
+[project]
+name = "formschneider"
+version = "0"
+description = "Ornamental initials from image models, cut to the outlines levineuwirth.org draws in, and the trial that compares the models"
+requires-python = ">=3.12"
+dependencies = ["fonttools>=4.50", "pillow>=11", "numpy>=2", "brotli>=1.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.uv]
+package = false
