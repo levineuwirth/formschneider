@@ -10,18 +10,26 @@ from fontTools.ttLib import TTFont
 from paths import Path
 
 
-def glyph(font: str, char: str) -> tuple[Path, tuple[int, int]]:
+def bounds(font: str, char: str) -> tuple[float, float, float, float]:
     f = TTFont(font)
     gs = f.getGlyphSet()
-    g = gs[f.getBestCmap()[ord(char)]]
-    bp, rp = BoundsPen(gs), RecordingPen()
-    g.draw(bp)
-    g.draw(rp)
-    x0, y0, x1, y1 = bp.bounds
+    bp = BoundsPen(gs)
+    gs[f.getBestCmap()[ord(char)]].draw(bp)
+    return bp.bounds
 
-    def t(p):
-        return (p[0] - x0, y1 - p[1])
 
+def glyph(font: str, char: str) -> tuple[Path, tuple[int, int]]:
+    x0, y0, x1, y1 = bounds(font, char)
+    path = outline(font, char, lambda p: (p[0] - x0, y1 - p[1]))
+    return path, (round(x1 - x0), round(y1 - y0))
+
+
+def outline(font: str, char: str, t) -> Path:
+    """The glyph's contours, each point carried by t from font units."""
+    f = TTFont(font)
+    gs = f.getGlyphSet()
+    rp = RecordingPen()
+    gs[f.getBestCmap()[ord(char)]].draw(rp)
     path: Path = []
     sub, cur = [], (0.0, 0.0)
     for op, args in rp.value:
@@ -43,4 +51,4 @@ def glyph(font: str, char: str) -> tuple[Path, tuple[int, int]]:
                 cur = p
         elif op in ("closePath", "endPath"):
             path.append(sub)
-    return path, (round(x1 - x0), round(y1 - y0))
+    return path
