@@ -19,7 +19,10 @@ letters = "DGLNQT"          # none of the trial's six, so none can be copied (X 
 
 [[model]]
 provider = "openai"
-model = "gpt-image-2.5-sunburst"
+# the dated snapshot, so every request in the trial is to the same model
+# (developers.openai.com/api/docs/models/gpt-image-2.5-sunburst)
+model = "gpt-image-2.5-sunburst-2026-09-08"
+name = "sunburst"
 sizes = [[1024, 1024], [1536, 1024]]   # each letter gets the one nearest its block's shape
 params = { quality = "high" }
 # per request, a guess: $0.053 for the image at 1024² high (survey of
@@ -31,18 +34,18 @@ terms = "OpenAI Services Agreement: the customer owns the output (openai.com/pol
 [prompt]
 whole = """\
 A woodcut ornamental initial as printed in France in the sixteenth century: \
-the capital letter {letter}, large and centered in a square block, among vine \
-scrolls (rinceau) of curling stems, leaves and small flowers, cut as solid \
-black shapes on an open white ground. Black ink on white only: the ground is \
-white, never black. No frame or border. No other letters or words anywhere. \
-Crisp, flat black edges: no paper texture, no shading, no hatching, no gray. \
-The reference images show the style to follow; take their ornament, not \
-their letters."""
+the capital letter {letter}, large and centered in a block that fills the \
+picture, among vine scrolls (rinceau) of curling stems, leaves and small \
+flowers, cut as solid black shapes on an open white ground. Black ink on \
+white only: the ground is white, never black. No frame or border. No other \
+letters or words anywhere. Crisp, flat black edges: no paper texture, no \
+shading, no hatching, no gray. The reference images show the style to \
+follow; take their ornament, not their letters."""
 ornament = """\
 The first image is a woodcut ornamental initial in which only the capital \
 letter {letter} has been cut. Fill the empty white space around the letter \
 with vine scrolls (rinceau) of curling stems, leaves and small flowers, cut \
-as solid black shapes on an open white ground and filling the square block \
+as solid black shapes on an open white ground and filling the picture \
 evenly, in the style of the other images. Leave the letter exactly as it is, \
 with a thin white gap around it. Draw no letters, words or frame. Black ink \
 on white only, crisp flat edges: no paper texture, no shading, no hatching, \

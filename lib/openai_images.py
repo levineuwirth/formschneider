@@ -6,6 +6,9 @@ canvas comes first, when there is one, and the mask applies to it; the
 references follow. OpenAI's mask is a PNG whose transparent pixels are
 where the model may draw, and the docs say the model may not follow its
 exact shape, which is why canvas.put_back restores the letter afterwards.
+
+The client never retries on its own: a retry is another request, billed,
+and the runner counts and records every request it makes.
 """
 
 import base64
@@ -28,7 +31,7 @@ class OpenAIImages:
     def __init__(self, model: str, client=None, **params):
         if client is None:
             import openai  # only when a request is really to be made
-            client = openai.OpenAI()
+            client = openai.OpenAI(max_retries=0)
         self.client, self.model, self.params = client, model, params
 
     def __call__(self, req: Request) -> Result:

@@ -20,6 +20,7 @@ from fonts import EBGI, SPECTRAL
 from glyph import glyph
 from letter import capital
 from model import Request, Result
+from model import error_fields as model_error_fields
 from openai_images import OpenAIImages
 from raster import bare_svg, rasterize
 
@@ -39,7 +40,8 @@ grow = 10
 letters = "D"
 [[model]]
 provider = "fake"
-model = "ebgi"
+model = "ebgi-2026-10-30"
+name = "ebgi"
 sizes = [[256, 256], [384, 256]]
 params = { quality = "low" }
 est_usd = 0.01
@@ -122,6 +124,28 @@ def fake_adapter(model, **params):
     return draw
 
 
+def test_the_openai_client_never_retries_on_its_own(monkeypatch):
+    made = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kw):
+            made.update(kw)
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+    OpenAIImages("m")
+    assert made == {"max_retries": 0}
+
+
+def test_an_error_is_recorded_without_its_message():
+    class APIStatusError(Exception):
+        status_code = 403
+        request_id = "req_abc123"
+        body = {"error": {"message": "Organization org-Secret42 must be verified",
+                          "type": "invalid_request_error", "code": "org-Secret42"}}
+    fields = model_error_fields(APIStatusError("Organization org-Secret42 must be verified"))
+    assert fields == {"class": "APIStatusError", "status": 403, "request_id": "req_abc123",
+                      "type": "invalid_request_error"}
+
+
 @pytest.fixture
 def spec(tmp_path):
     (tmp_path / "runs" / "t").mkdir(parents=True)
@@ -129,20 +153,29 @@ def spec(tmp_path):
     return run.load("t", tmp_path), tmp_path
 
 
-def test_a_run_plans_records_resumes_and_finishes(spec):
+quiet = lambda *a: None
+
+
+def saved(spec, root):
+    return [r for r in run.requests(spec, root).values() if r["state"] == "saved"]
+
+
+def test_a_run_plans_breadth_first_records_resumes_and_finishes(spec):
     spec, root = spec
-    quiet = lambda *a: None
-    assert len(run.plan(spec)) == 8
+    jobs = run.plan(spec)
+    assert len(jobs) == 8
+    assert [j.id for j in jobs[:2]] == ["whole-ebgi-F-01", "ornament-ebgi-F-01"]
     run.execute(spec, {"fake": fake_adapter}, go=False, root=root, log=quiet)
-    assert run.records(spec, root) == []
-    assert (root / "out/runs/t/inputs/W-canvas.png").exists()
+    assert run.events(spec, root) == []
     assert Image.open(root / "out/runs/t/inputs/W-canvas.png").size == (384, 256)
 
     run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
-    recs = run.records(spec, root)
-    assert len(recs) == 8 and all(r["status"] == "ok" for r in recs)
+    assert [e["event"] for e in run.events(spec, root)[:3]] == ["sent", "returned", "saved"]
+    recs = saved(spec, root)
+    assert len(recs) == 8
     orn = next(r for r in recs if r["route"] == "ornament")
-    assert {"canvas", "editable", "refs", "block"} <= set(orn["inputs"]) and orn["terms"] == "Test terms."
+    assert orn["model"] == "ebgi-2026-10-30" and orn["terms"] == "Test terms."
+    assert {"canvas", "editable", "refs", "block", "box"} <= set(orn["inputs"])
     assert run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet) == []
 
     rows = run.finish(spec, root)
@@ -151,32 +184,89 @@ def test_a_run_plans_records_resumes_and_finishes(spec):
     assert "Spectral SemiBold" in svg and "Test terms." in svg and 'class="initial-cut"' in svg
 
 
+def test_finishing_uses_the_inputs_sent_not_the_spec_as_it_is_now(spec):
+    spec, root = spec
+    spec["routes"], spec["letters"], spec["attempts"] = ["ornament"], "F", 1
+    run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    before = (run.finish(spec, root)[0], )
+    spec["letter"]["grow"], spec["letter"]["weight"] = 30, "Bold"
+    assert run.finish(spec, root)[0] == before[0]
+    (rec,) = saved(spec, root)
+    kept = root / "out/runs/t/inputs/sha256" / f"{rec['inputs']['editable']}.png"
+    Image.new("1", Image.open(kept).size, 1).save(kept)
+    with pytest.raises(SystemExit):
+        run.finish(spec, root)
+
+
 def test_a_failed_request_is_recorded_and_stops_the_run(spec):
     spec, root = spec
 
     def broken(model, **params):
         def fail(req):
-            raise RuntimeError("no")
+            raise RuntimeError("org-Secret42 said no")
         return fail
     with pytest.raises(RuntimeError):
-        run.execute(spec, {"fake": broken}, go=True, root=root, log=lambda *a: None)
-    (rec,) = run.records(spec, root)
-    assert rec["status"] == "error" and "RuntimeError" in rec["error"]
+        run.execute(spec, {"fake": broken}, go=True, root=root, log=quiet)
+    (rec,) = run.requests(spec, root).values()
+    assert rec["state"] == "failed" and rec["error"] == {"class": "RuntimeError"}
+    assert "Secret42" not in (root / "runs/t/records.jsonl").read_text()
+
+
+def test_a_picture_that_cannot_be_read_is_still_accounted_for(spec):
+    spec, root = spec
+    spec["max_requests"] = 8
+
+    def garbled(model, **params):
+        return lambda req: Result(b"not a picture", request_id="req_x", seconds=0.0)
+    with pytest.raises(Exception):
+        run.execute(spec, {"fake": garbled}, go=True, root=root, log=quiet)
+    assert [e["event"] for e in run.events(spec, root)] == ["sent", "returned", "failed"]
+    (rec,) = run.requests(spec, root).values()
+    assert rec["request_id"] == "req_x"
+    # it counts against the ceiling, and its job is planned again
+    with pytest.raises(SystemExit):
+        run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+
+
+def test_a_request_never_heard_of_again_stops_the_run_until_abandoned(spec):
+    spec, root = spec
+
+    def vanishing(model, **params):
+        def gone(req):
+            raise KeyboardInterrupt  # the process stops between sending and hearing back
+        return gone
+    with pytest.raises(KeyboardInterrupt):
+        run.execute(spec, {"fake": vanishing}, go=True, limit=1, root=root, log=quiet)
+    with pytest.raises(SystemExit, match="never heard of again"):
+        run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    run.execute(spec, {"fake": fake_adapter}, go=True, abandon=True, root=root, log=quiet)
+    states = [r["state"] for r in run.requests(spec, root).values()]
+    assert states.count("abandoned") == 1 and states.count("saved") == 8
+
+
+def test_a_returned_picture_on_disk_is_not_asked_for_again(spec):
+    spec, root = spec
+    spec["routes"], spec["letters"], spec["attempts"] = ["whole"], "F", 1
+    run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    f = root / "runs/t/records.jsonl"
+    f.write_text("".join(line + "\n" for line in f.read_text().splitlines()[:2]))  # lost "saved"
+    assert run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet) == []
+    assert [e["event"] for e in run.events(spec, root)] == ["sent", "returned", "saved"]
 
 
 def test_a_run_will_not_pass_its_request_ceiling(spec):
     spec, root = spec
     spec["max_requests"] = 3
     with pytest.raises(SystemExit):
-        run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=lambda *a: None)
-    assert run.records(spec, root) == []
+        run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    assert run.events(spec, root) == []
 
 
 def test_a_picture_that_is_not_the_recorded_one_is_refused(spec):
     spec, root = spec
     spec["routes"], spec["letters"], spec["attempts"] = ["whole"], "F", 1
-    run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=lambda *a: None)
-    (rec,) = run.records(spec, root)
+    run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    (rec,) = saved(spec, root)
     Image.new("L", (256, 256), 0).save(root / "out/runs/t" / rec["output"]["file"])
     with pytest.raises(SystemExit):
         run.finish(spec, root)

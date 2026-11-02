@@ -73,13 +73,29 @@ measured on a picture before anything is traced.
 
 ## Generating
 
-A run is a directory under `runs/`: `spec.toml` says what is asked of
-which models (letters, attempts, routes, sizes, prompts, references, the
-kept letter), and `records.jsonl` gets one line per request as it
-returns. Each line records what was sent (the prompt, the settings, and a
-checksum of every input), what came back (the request id, usage, and the
-picture's checksum), the provider's terms, and when. Both files are in
-git. The pictures and everything made from them go to `out/runs/NAME/`.
+A run is a directory under `runs/`. `spec.toml` says what is asked of
+which models: letters, attempts, routes, sizes, prompts, references, and
+the kept letter. Models are named by their dated snapshot, so every
+request in a run goes to the same one. `records.jsonl` is an append-only
+log of each request's events:
+
+- **sent:** written to disk before the request goes out, with the prompt,
+  the settings, a checksum of every input, the terms and the time;
+- **returned:** the request id, usage, and the checksum of what came
+  back, written before the picture is touched;
+- **saved:** the picture written and read back;
+- **failed:** the error's class, status, request id and provider code,
+  but never its message, which can name an account.
+
+The client never retries on its own, so every request is on record before
+it can cost anything, and none is repeated silently. A request that was
+sent and never heard of again stops the run until the author has checked
+the provider's usage and passes `--abandon`. Requests go out breadth
+first, so `--limit` samples every route and letter. Both files are in git.
+The pictures, and every input under its checksum, go to `out/runs/NAME/`.
+Finishing reads only the record and the files it names, checked, so
+editing the spec after a run cannot change what the run's pictures are
+finished with.
 
 - **Ornament only:** Spectral SemiBold's capital is set in its block on a
   canvas of the provider's size, and the model may draw everywhere but the
@@ -92,7 +108,7 @@ git. The pictures and everything made from them go to `out/runs/NAME/`.
 
 ```sh
 bin/generate pilot-openai        # plan only: what would be sent, and its inputs in out/
-bin/generate pilot-openai --go   # send it (keys from .env), stopping at the first error
+bin/generate pilot-openai --go --limit 4   # send four (keys from .env); stops at an error
 bin/finish pilot-openai          # put back, cut, measure: out/runs/pilot-openai/finished/
 ```
 
