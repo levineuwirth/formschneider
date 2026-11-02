@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Put the author's choices from a run's comparison page (bin/compare) into
+git, beside the verdicts.
+
+The page keeps them in its artifact's database. Exported from there, they
+are DIR/choices/<id>.json, {verdict, tolerance, at}. Each is checked
+against the verdicts and the finishing: there must be one for every kept
+initial over budget at the trial's tolerance and none for any other, a
+kept one must name a tolerance the page showed (on the fit's ladder, no
+looser than the fitted one), and a dropped one none. Writes
+runs/NAME/choices.jsonl, sorted, one line per initial (id, route,
+letter, attempt, verdict, tolerance, at), and prints the set the site
+would take: every kept initial at its tolerance, the trial's where it
+fits already.
+
+Usage: choices NAME DIR
+"""
+
+import collections
+import json
+import sys
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+import run
+from finish import BUDGET, FINISH, LADDER
+
+
+def main() -> None:
+    spec = run.load(sys.argv[1])
+    src = File(sys.argv[2]) / "choices"
+    out = ROOT / "out" / "runs" / spec["name"]
+    finished = {m["id"]: m for m in json.loads((out / "finished" / "measures.json").read_text())}
+    lines = [json.loads(x) for x in (ROOT / "runs" / spec["name"] / "verdicts.jsonl").read_text().splitlines()]
+    kept = {x["id"] for x in lines if x["kind"] == "initial" and x["verdict"] == "keep"}
+    over = {i for i in kept if finished[i]["path_bytes"] > BUDGET}
+    choices = {f.stem: json.loads(f.read_text()) for f in sorted(src.glob("*.json"))}
+    if stray := sorted(set(choices) - over):
+        sys.exit(f"choices on initials not kept or not over budget: {', '.join(stray)}")
+    if missing := sorted(over - set(choices)):
+        sys.exit(f"{len(missing)} kept initials over budget have no choice: {', '.join(missing)}")
+    for i, c in sorted(choices.items()):
+        t, fit = c.get("tolerance"), finished[i]["fit_tolerance"]
+        if c.get("verdict") == "keep" and not (t in LADDER and t <= fit):
+            sys.exit(f"{i}: kept at {t}, not a tolerance the page showed (ladder to {fit:g})")
+        if c.get("verdict") == "reject" and t is not None:
+            sys.exit(f"{i}: dropped, yet names a tolerance")
+        if c.get("verdict") not in ("keep", "reject"):
+            sys.exit(f"{i}: neither kept nor dropped")
+    rows = []
+    for i, c in sorted(choices.items()):
+        m = finished[i]
+        rows.append({"id": i, "route": m["route"], "letter": m["letter"], "attempt": m["attempt"],
+                     "verdict": c["verdict"], "tolerance": c["tolerance"], "at": c["at"]})
+    path = ROOT / "runs" / spec["name"] / "choices.jsonl"
+    path.write_text("".join(json.dumps(x) + "\n" for x in rows))
+    site = {i: FINISH["tolerance"] for i in kept - over}
+    site |= {x["id"]: x["tolerance"] for x in rows if x["verdict"] == "keep"}
+    for route in spec["routes"]:
+        mine = [x for x in rows if x["route"] == route]
+        fitted = sum(x["verdict"] == "keep" and x["tolerance"] == finished[x["id"]]["fit_tolerance"] for x in mine)
+        tighter = sum(x["verdict"] == "keep" and x["tolerance"] < finished[x["id"]]["fit_tolerance"] for x in mine)
+        tols = collections.Counter(t for i, t in site.items() if finished[i]["route"] == route)
+        print(f"{route}: of {len(mine)} over budget, {fitted} kept fitted, {tighter} kept tighter over budget, "
+              f"{len(mine) - fitted - tighter} dropped; the site's set: {sum(tols.values())} initials, "
+              + ", ".join(f"{n} at t{t:g}" for t, n in sorted(tols.items())))
+    print(path)
+
+
+if __name__ == "__main__":
+    main()
