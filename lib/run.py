@@ -48,6 +48,7 @@ from fonts import EBGI, SPECTRAL
 from initial import initial_svg, measure
 from letter import capital
 from model import Request, error_fields
+from paths import Path, fmt
 from raster import bare_svg, rasterize
 from simplify import simplify
 
@@ -261,6 +262,29 @@ def picture(out: File, r: dict) -> Image.Image:
     return gray
 
 
+def letter_outline(out: File, r: dict, box: tuple[int, int]) -> Path | None:
+    """The kept capital's own outline (ornament route) in the cut's frame,
+    as it was sent: from the font, cap height and halo the record names,
+    its canvas and halo drawn again as they were made and required to be
+    the ones sent, pixel for pixel. None for a drawn letter."""
+    if r["route"] != "ornament":
+        return None
+    i = r["inputs"]
+    family, weight = i["letter"].rsplit(" ", 1)
+    if family != "Spectral":
+        raise SystemExit(f"{r['id']}: no font for the kept letter {i['letter']}")
+    path, lbox = capital(SPECTRAL.format(weight=weight), r["letter"], height=i["box"][1], cap=i["cap"])
+    sent = np.asarray(_kept(out, i["canvas"]).convert("L"))
+    free = np.asarray(_kept(out, i["editable"])).astype(bool)
+    again, editable, lay = letter_canvas(path, lbox, tuple(r["size"]), i["grow"])
+    if (list(lbox) != list(i["box"]) or list(lay.block) != list(i["block"])
+            or not np.array_equal(np.asarray(again), sent) or not np.array_equal(editable, free)):
+        raise SystemExit(f"{r['id']}: the kept letter drawn again is not the canvas sent "
+                         "(its settings, the font, or the renderer differ)")
+    kx, ky = box[0] / lbox[0], box[1] / lbox[1]
+    return [[(op, tuple((x * kx, y * ky) for x, y in pts)) for op, pts in sub] for sub in path]
+
+
 def finish(spec: dict, root: File = ROOT, out: File | None = None) -> list[dict]:
     """Every picture the run has made, through the fixed finishing: the
     letter put back (ornament route) from the inputs kept when it was sent,
@@ -275,16 +299,18 @@ def finish(spec: dict, root: File = ROOT, out: File | None = None) -> list[dict]
     for r in (r for r in requests(spec, root).values() if r["state"] == "saved"):
         gray = picture(out, r)
         raw, box = traced(gray)
+        letter = letter_outline(out, r, box)
         path = simplify(raw, FINISH["tolerance"])
-        svg = initial_svg(path, box, credit(spec, r))
+        svg = initial_svg(path, box, credit(spec, r), letter)
         (out / "finished" / f"{r['id']}.svg").write_text(svg)
         fit, t = fitted(raw)
-        fit_svg = initial_svg(fit, box, credit(spec, r, FINISH | {"tolerance": t}))
+        fit_svg = initial_svg(fit, box, credit(spec, r, FINISH | {"tolerance": t}), letter)
         (out / "finished" / "fitted").mkdir(exist_ok=True)
         (out / "finished" / "fitted" / f"{r['id']}.svg").write_text(fit_svg)
         fit_bytes = measure(fit, fit_svg)["path_bytes"]
         row = {"id": r["id"], "route": r["route"], "model": r["model"], "letter": r["letter"],
                "attempt": r["attempt"], **measures(gray, path, box, svg), "box": list(box),
+               "outline_bytes": len(fmt(letter)) if letter else 0,
                "fit_tolerance": t, "fit_path_bytes": fit_bytes,
                "fit_budget": round(fit_bytes / BUDGET, 3)}
         rows.append(row)

@@ -17,5 +17,7 @@ Read `README.md` first. The plan of record is
   one request and nothing else, and the record keeps it.
 - **The site's format is a contract.** `lib/initial.py` writes what
   levineuwirth.org's `MARKS.md` §2.6 describes; `tests/test_cut.py` holds it
-  to the site's EB Garamond set byte for byte. Change both together.
+  to the site's EB Garamond set, the whole file but each initial's credit
+  and drawing-in times (`--t`), which are each set's own. Change both
+  together.
 - Site and repository copy is American English.

@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, str(File(__file__).resolve().parent.parent / "lib"))
 from fonts import EBGI
 from glyph import glyph
+from initial import initial_svg
 from paths import fmt, parse
 from raster import bare_svg, iou, rasterize
 from trace import trace
@@ -40,9 +41,39 @@ def test_font_outlines_are_the_sites(c):
     assert fmt(parse(d)) == d
 
 
+def own(svg: str) -> str:
+    """An initial without what is each set's own: its credit, and the moment
+    each cut is drawn in (--t)."""
+    return re.sub(r"--t:[0-9.]+s", "--t:", re.sub(r"<!--.*?-->", "", svg))
+
+
+@needs_font
+@pytest.mark.skipif(not SET.is_dir(), reason="levineuwirth.org's set not found")
+@pytest.mark.parametrize("c", "ADFGLNOQTX")
+def test_an_initial_is_written_as_the_site_holds_it(c):
+    # The whole file, not only its outlines: the layers, their classes and
+    # attributes, the cuts in order, the gradient; so a change to the
+    # site's format fails here as well as there.
+    path, box = glyph(EBGI, c)
+    assert own(initial_svg(path, box, "credit")) == own((SET / f"{c}.svg").read_text())
+
+
 @needs_font
 def test_trace_recovers_a_drawn_initial():
     path, box = glyph(EBGI, "O")
     ref = rasterize(bare_svg(path, box), 500)
     traced = trace(rasterize(bare_svg(path, box), 1024), box)
     assert iou(ref, rasterize(bare_svg(traced, box), 500)) > 0.97
+
+
+@needs_font
+@pytest.mark.skipif(not SET.is_dir(), reason="levineuwirth.org's set not found")
+def test_cuts_are_drawn_in_over_the_sites_span():
+    # The set keeps no rule for its moments; ours, by where each cut starts,
+    # stays within 0.08 s of its every one.
+    for c in "ADFGLNOQTX":
+        path, box = glyph(EBGI, c)
+        ours = re.findall(r"--t:([0-9.]+)s", initial_svg(path, box, "credit"))
+        theirs = re.findall(r"--t:([0-9.]+)s", (SET / f"{c}.svg").read_text())
+        assert len(ours) == len(theirs)
+        assert max(abs(float(a) - float(b)) for a, b in zip(ours, theirs)) <= 0.08, c

@@ -90,12 +90,13 @@ def main() -> None:
                    key=lambda r: r["id"])
     for n, r in enumerate(saved, 1):
         raw, box = traced(run.picture(out, r))
+        letter = run.letter_outline(out, r, box)
         paths = {t: simplify(raw, t) for t in tols}
         base = raster(paths[FINISH["tolerance"]], box, 1000 * PER_UNIT)
         for t in tols:
             path = paths[t]
             finish = FINISH | {"tolerance": t}
-            svg = initial_svg(path, box, run.credit(spec, r, finish))
+            svg = initial_svg(path, box, run.credit(spec, r, finish), letter)
             (sweep / f"t{t:g}").mkdir(parents=True, exist_ok=True)
             (sweep / f"t{t:g}" / f"{r['id']}.svg").write_text(svg)
             m = measure(path, svg)

@@ -4,6 +4,7 @@ finished can be checked exactly."""
 
 import base64
 import json
+import re
 import sys
 from pathlib import Path as File
 from types import SimpleNamespace
@@ -181,7 +182,34 @@ def test_a_run_plans_breadth_first_records_resumes_and_finishes(spec):
     rows = run.finish(spec, root)
     assert len(rows) == 8 and all(r["path_bytes"] > 0 for r in rows)
     svg = (root / "out/runs/t/finished" / f"{orn['id']}.svg").read_text()
-    assert "Spectral SemiBold" in svg and "Test terms." in svg and 'class="initial-cut"' in svg
+    assert "Spectral SemiBold" in svg and "Test terms." in svg
+    # the kept letter's own outline, and the cuts grown from it, so a Draft shows the letter alone
+    cuts = re.findall(r'<path class="initial-cut[^"]*"[^>]*>', svg)
+    outline = [c for c in cuts if "initial-outline" in c]
+    assert len(outline) == 1 and 'vector-effect="non-scaling-stroke"' in outline[0]
+    grown = [c for c in cuts if c not in outline]
+    assert grown and all("initial-growth" in c and 'vector-effect="non-scaling-stroke"' in c for c in grown)
+    whole = next(r for r in recs if r["route"] == "whole")
+    plain = (root / "out/runs/t/finished" / f"{whole['id']}.svg").read_text()
+    assert "initial-outline" not in plain and "initial-growth" not in plain and 'class="initial-cut"' in plain
+
+
+def test_the_kept_letter_must_be_the_one_sent(spec):
+    spec, root = spec
+    spec["routes"], spec["letters"], spec["attempts"] = ["ornament"], "F", 1
+    run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    (rec,) = saved(spec, root)
+    out = root / "out/runs/t"
+    assert run.letter_outline(out, rec, (1000, 1000))
+    cap = rec["inputs"]["cap"]
+    for changed in (0.6, cap + 0.003):  # a small change in the letter is still a different letter
+        rec["inputs"]["cap"] = changed
+        with pytest.raises(SystemExit):
+            run.letter_outline(out, rec, (1000, 1000))
+    # a halo wide enough to differ on the fixture's 256 px canvas (10 and 11 units draw the same)
+    rec["inputs"]["cap"], rec["inputs"]["grow"] = cap, rec["inputs"]["grow"] + 5
+    with pytest.raises(SystemExit):
+        run.letter_outline(out, rec, (1000, 1000))
 
 
 def test_finishing_uses_the_inputs_sent_not_the_spec_as_it_is_now(spec):
