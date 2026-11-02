@@ -1,0 +1,312 @@
+<title>__TITLE__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Fira+Sans:wght@400;500&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* A curator's bench: the site's own paper and type for the specimens, a
+   quiet sans for the controls. Rows are letters, columns attempts. */
+:root {
+  --bg: #faf8f4; --fg: #1a1a1a; --faint: #6e6a64; --rule: #e2dcd2; --well: #f1ede6;
+  --keep: #2f6b3a; --keep-bg: #e3efe4; --reject: #8f2d2d; --reject-bg: #f4e2df; --focus: #2b4a6f;
+  --serif: "Spectral", Georgia, "Times New Roman", serif;
+  --sans: "Fira Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  /* the site's paper, light (engine/static/css/base.css) */
+  --p-bg: #faf8f4; --p-text: #1a1a1a; --p-glow: drop-shadow(0 0 0.28em rgba(150, 105, 40, 0.30));
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121212; --fg: #d4d0c8; --faint: #8b8680; --rule: #2c2a27; --well: #1a1918;
+  --keep: #8cc497; --keep-bg: #1f2e22; --reject: #e09a92; --reject-bg: #3a2220; --focus: #9db7d6;
+  --p-bg: #121212; --p-text: #d4d0c8; --p-glow: drop-shadow(0 0 0.3em rgba(235, 200, 140, 0.28));
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121212; --fg: #d4d0c8; --faint: #8b8680; --rule: #2c2a27; --well: #1a1918;
+  --keep: #8cc497; --keep-bg: #1f2e22; --reject: #e09a92; --reject-bg: #3a2220; --focus: #9db7d6;
+  --p-bg: #121212; --p-text: #d4d0c8; --p-glow: drop-shadow(0 0 0.3em rgba(235, 200, 140, 0.28));
+  color-scheme: dark }
+/* a paper chosen on the page overrides the viewer's theme for the specimens */
+.bench[data-paper="light"] { --p-bg: #faf8f4; --p-text: #1a1a1a; --p-glow: drop-shadow(0 0 0.28em rgba(150, 105, 40, 0.30)); }
+.bench[data-paper="dark"] { --p-bg: #121212; --p-text: #d4d0c8; --p-glow: drop-shadow(0 0 0.3em rgba(235, 200, 140, 0.28)); }
+.bench[data-paper="cappuccino"] { --p-bg: #553a28; --p-text: #ead0a0; --p-glow: drop-shadow(0 0 0.3em rgba(255, 216, 150, 0.34)); }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 88rem; margin: 0 auto; padding-block: 2rem 4rem; display: grid; gap: 2.5rem; }
+header { display: grid; gap: 0.75rem; max-width: 60rem; }
+h1 { font: 600 2rem/1.15 var(--serif); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.5rem/1.2 var(--serif); margin: 0; }
+.lede { margin: 0; color: var(--faint); max-width: 62ch; }
+.lede code, .mono { font-family: var(--mono); font-size: 0.82em; }
+.tally { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-variant-numeric: tabular-nums; }
+.tally b { font-weight: 500; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; padding-block: 0.75rem;
+  border-block: 1px solid var(--rule); position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.seg button { font: 500 0.8rem var(--sans); letter-spacing: 0.02em; padding: 0.35rem 0.7rem; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--well); box-shadow: inset 0 -2px 0 var(--focus); }
+.label { font: 500 0.72rem var(--sans); text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+.btn { font: 500 0.82rem var(--sans); padding: 0.4rem 0.8rem; border: 1px solid var(--rule); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.note { color: var(--faint); font-size: 0.85rem; }
+.note.warn { color: var(--reject); }
+
+section.route { display: grid; gap: 1.5rem; }
+.route-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 1rem; }
+.letter-row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); gap: 1rem; align-items: start; border-top: 1px solid var(--rule); padding-top: 1rem; }
+.letter-row > .rowlabel { font: 600 1.6rem/1 var(--serif); color: var(--faint); padding-top: 0.2rem; }
+/* two to a row, near the site's own measure, so an initial is judged against a real line */
+.attempts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr)); gap: 1rem 1.5rem; }
+.spec { display: grid; gap: 0.5rem; min-width: 0; padding: 0.6rem; border-radius: 8px; border: 1px solid transparent; }
+.spec[data-verdict="keep"] { border-color: var(--keep); background: var(--keep-bg); }
+.spec[data-verdict="reject"] { border-color: var(--reject); background: var(--reject-bg); }
+.spec-meta { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; font: 0.78rem var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
+.verdict { display: flex; gap: 0.4rem; }
+.verdict button { flex: 1; font: 500 0.82rem var(--sans); padding: 0.35rem 0; border-radius: 6px; border: 1px solid var(--rule); background: var(--bg); color: var(--fg); cursor: pointer; }
+.verdict button[data-v="keep"][aria-pressed="true"] { background: var(--keep); border-color: var(--keep); color: var(--bg); }
+.verdict button[data-v="reject"][aria-pressed="true"] { background: var(--reject); border-color: var(--reject); color: var(--bg); }
+.verdict button:disabled { cursor: default; opacity: 0.55; }
+
+/* The specimen: a paragraph as the site sets it, 23 px Spectral at 1.65,
+   its initial three lines tall (engine/static/css/typography.css, section 4). */
+.paper { background: var(--p-bg); color: var(--p-text); border-radius: 6px; padding: 0.9rem 1rem; overflow: hidden; }
+.page-p { --line-height: 1.65; font: 23px/1.65 var(--serif); margin: 0; hyphens: auto; max-width: 40rem;
+  max-height: calc(4 * 1.65em); overflow: hidden; }
+.initial { --initial-lines: 3; --initial-cap: 0.66em; --initial-rise: 0.298em; display: block; float: left;
+  height: calc((var(--initial-lines) - 1) * var(--line-height) * 1em + var(--initial-cap));
+  margin: calc(0.5 * var(--line-height) * 1em + var(--initial-rise) - var(--initial-cap)) 0.22em 0 0;
+  color: var(--p-text); filter: var(--p-glow, none); cursor: zoom-in; border: 0; padding: 0; background: none;
+  font: inherit; line-height: inherit; /* a button does not inherit the paragraph's size, and the box is in em */ }
+.initial svg { display: block; height: 100%; width: auto; overflow: visible; }
+.initial .initial-cut:not(.initial-growth) { vector-effect: non-scaling-stroke; }
+@media (prefers-reduced-motion: no-preference) {
+  .initial .initial-cut { stroke-dasharray: 1; stroke-dashoffset: 1; animation: initial-cut var(--d, 0.7s) ease-out var(--t, 0s) forwards; }
+  .initial .initial-ink, .initial .initial-shade { opacity: 0; animation: initial-ink var(--d, 0.5s) ease var(--t, 1s) forwards; }
+}
+@keyframes initial-cut { to { stroke-dashoffset: 0; } }
+@keyframes initial-ink { to { opacity: 1; } }
+
+.judge { display: grid; gap: 0.6rem; max-width: 46rem; padding: 1rem; border: 1px solid var(--rule); border-radius: 8px; background: var(--well); }
+.judge p { margin: 0; }
+.judge textarea { font: 0.95rem/1.45 var(--sans); width: 100%; box-sizing: border-box; min-height: 5rem; padding: 0.5rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--bg); color: var(--fg); resize: vertical; }
+.judge .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+
+dialog { border: 1px solid var(--rule); border-radius: 10px; padding: 0; max-width: min(92vw, 56rem); background: var(--bg); color: var(--fg); }
+dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.zoom { display: grid; gap: 0.75rem; padding: 1rem; }
+.zoom .paper { display: grid; place-items: center; padding: 1.5rem; }
+.zoom .big { color: var(--p-text); filter: var(--p-glow, none); height: min(62vh, 34rem); }
+.zoom .big svg { height: 100%; width: auto; display: block; overflow: visible; }
+.zoom .big .initial-cut:not(.initial-growth) { vector-effect: non-scaling-stroke; }
+@media (prefers-reduced-motion: no-preference) {
+  .zoom .big .initial-cut { stroke-dasharray: 1; stroke-dashoffset: 1; animation: initial-cut var(--d, 0.7s) ease-out var(--t, 0s) forwards; }
+  .zoom .big .initial-ink, .zoom .big .initial-shade { opacity: 0; animation: initial-ink var(--d, 0.5s) ease var(--t, 1s) forwards; }
+}
+.zoom .bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; align-items: center; }
+@media (max-width: 30rem) { .letter-row { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 1.6rem; } }
+</style>
+
+<main>
+  <header>
+    <h1>__TITLE__</h1>
+    <p class="lede">__LEDE__</p>
+    <div class="tally" id="tally" aria-live="polite"></div>
+    <p class="note" id="status">Loading saved decisions…</p>
+  </header>
+
+  <div class="toolbar">
+    <span class="label">Paper</span>
+    <span class="seg" id="paper" role="group" aria-label="Paper">
+      <button type="button" data-paper="" aria-pressed="true">Your theme</button>
+      <button type="button" data-paper="light" aria-pressed="false">Light</button>
+      <button type="button" data-paper="dark" aria-pressed="false">Dark</button>
+      <button type="button" data-paper="cappuccino" aria-pressed="false">Cappuccino</button>
+    </span>
+    <button type="button" class="btn" id="replay">Replay drawing</button>
+  </div>
+
+  <div class="bench" id="bench"></div>
+</main>
+
+<dialog id="zoom" aria-label="Initial, enlarged">
+  <div class="zoom">
+    <div class="bar"><span class="mono" id="zoom-id"></span>
+      <span class="row"><button type="button" class="btn" id="zoom-replay">Replay</button>
+      <button type="button" class="btn" id="zoom-close">Close</button></span></div>
+    <div class="paper"><div class="big" id="zoom-big"></div></div>
+  </div>
+</dialog>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+(() => {
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const ROUTES = DATA.routes, ITEMS = DATA.items, TEXT = DATA.text;
+  const bench = document.getElementById("bench");
+  const verdicts = {}, sets = {};
+  let db = null, canWrite = false;
+  const busy = new Set();
+
+  // each SVG declares id="initial-ink"; on one page they must differ, as the site's filter makes them
+  const svgFor = (item, n) => item.svg.replaceAll('id="initial-ink"', `id="ink-${n}"`).replaceAll("url(#initial-ink)", `url(#ink-${n})`);
+  let serial = 0;
+
+  function el(tag, attrs = {}, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+    }
+    for (const k of kids) if (k) e.append(k);
+    return e;
+  }
+
+  function specimen(item) {
+    const fig = el("figure", { class: "spec", "data-id": item.id });
+    fig.style.margin = "0";
+    const p = el("p", { class: "page-p" });
+    const ini = el("button", { class: "initial", type: "button", "aria-label": `Enlarge ${item.id}` });
+    ini.innerHTML = svgFor(item, serial++);
+    ini.addEventListener("click", () => zoom(item));
+    p.append(ini, document.createTextNode(TEXT[item.letter].slice(1)));
+    const meta = el("div", { class: "spec-meta" },
+      el("span", { text: `${item.route === "whole" ? "w" : "o"}${item.attempt}` }),
+      el("span", { text: `${item.kb.toFixed(1)} KB · ${item.budget.toFixed(2)}×` }));
+    const keep = el("button", { type: "button", "data-v": "keep", "aria-pressed": "false", text: "Keep" });
+    const reject = el("button", { type: "button", "data-v": "reject", "aria-pressed": "false", text: "Reject" });
+    for (const b of [keep, reject]) b.addEventListener("click", () => decide(item.id, b.dataset.v));
+    fig.append(el("div", { class: "paper" }, p), meta, el("div", { class: "verdict", role: "group", "aria-label": `Verdict on ${item.id}` }, keep, reject));
+    return fig;
+  }
+
+  function build() {
+    for (const route of ROUTES) {
+      const sec = el("section", { class: "route", id: `route-${route.key}` });
+      sec.append(el("div", { class: "route-head" }, el("h2", { text: route.title }), el("span", { class: "note", text: route.note })));
+      for (const letter of DATA.letters) {
+        const row = el("div", { class: "letter-row" }, el("div", { class: "rowlabel", text: letter }));
+        const grid = el("div", { class: "attempts" });
+        for (const item of ITEMS.filter(i => i.route === route.key && i.letter === letter)) grid.append(specimen(item));
+        row.append(grid);
+        sec.append(row);
+      }
+      const judge = el("div", { class: "judge", "data-route": route.key });
+      const ta = el("textarea", { id: `note-${route.key}`, placeholder: "What makes it read as a set, or not", "aria-label": `Note on ${route.title}` });
+      const seg = el("span", { class: "seg", role: "group", "aria-label": "Reads as one set" });
+      for (const [v, t] of [["yes", "Yes"], ["partly", "Partly"], ["no", "No"]]) {
+        const b = el("button", { type: "button", "data-j": v, "aria-pressed": "false", text: t });
+        b.addEventListener("click", () => { for (const x of seg.children) x.setAttribute("aria-pressed", String(x === b)); });
+        seg.append(b);
+      }
+      const save = el("button", { type: "button", class: "btn", text: "Save judgment" });
+      const said = el("span", { class: "note" });
+      save.addEventListener("click", () => judgeSave(route.key, seg, ta, said));
+      judge.append(el("p", { class: "label", text: "The set" }), el("p", { text: `Do the ${route.short} read as one set?` }),
+        el("div", { class: "row" }, seg), ta, el("div", { class: "row" }, save, said));
+      sec.append(judge);
+      bench.append(sec);
+    }
+  }
+
+  function paint() {
+    for (const fig of bench.querySelectorAll(".spec")) {
+      const v = verdicts[fig.dataset.id] || "";
+      fig.dataset.verdict = v;
+      for (const b of fig.querySelectorAll(".verdict button")) {
+        b.setAttribute("aria-pressed", String(b.dataset.v === v));
+        b.disabled = !canWrite || busy.has(fig.dataset.id);
+      }
+    }
+    for (const j of bench.querySelectorAll(".judge")) {
+      const s = sets[j.dataset.route];
+      const ta = j.querySelector("textarea"), save = j.querySelector(".btn");
+      if (s && document.activeElement !== ta && !ta.dataset.dirty) ta.value = s.note || "";
+      for (const b of j.querySelectorAll("[data-j]")) if (s && !ta.dataset.dirty) b.setAttribute("aria-pressed", String(b.dataset.j === s.judgment));
+      save.disabled = ta.disabled = !canWrite;
+      for (const b of j.querySelectorAll("[data-j]")) b.disabled = !canWrite;
+    }
+    const tally = document.getElementById("tally");
+    tally.replaceChildren(...ROUTES.map(r => {
+      const ids = ITEMS.filter(i => i.route === r.key).map(i => i.id);
+      const keep = ids.filter(id => verdicts[id] === "keep").length, decided = ids.filter(id => verdicts[id]).length;
+      return el("span", {}, el("b", { text: `${r.title}: ` }), document.createTextNode(`${keep} kept of ${ids.length} attempts, ${decided} decided`));
+    }));
+  }
+
+  async function decide(id, v) {
+    if (!db || !canWrite || busy.has(id)) return;
+    const next = verdicts[id] === v ? null : v;   // pressing the chosen verdict again clears it
+    busy.add(id); paint();
+    try {
+      const ref = db.doc(`verdicts/${id}`);
+      if (next) await ref.set({ verdict: next, at: new Date().toISOString() }); else await ref.delete();
+      if (next) verdicts[id] = next; else delete verdicts[id];
+    } catch (e) {
+      status(`That decision was not saved (${e && e.code || "error"}). Try again.`, true);
+    } finally { busy.delete(id); paint(); }
+  }
+
+  async function judgeSave(route, seg, ta, said) {
+    if (!db || !canWrite) return;
+    const chosen = [...seg.children].find(b => b.getAttribute("aria-pressed") === "true");
+    if (!chosen) { said.textContent = "Choose Yes, Partly or No first."; return; }
+    said.textContent = "Saving…";
+    try {
+      await db.doc(`sets/${route}`).set({ judgment: chosen.dataset.j, note: ta.value.trim(), at: new Date().toISOString() });
+      delete ta.dataset.dirty; said.textContent = "Saved.";
+    } catch (e) { said.textContent = `Not saved (${e && e.code || "error"}). Try again.`; }
+  }
+
+  function status(text, warn = false) { const s = document.getElementById("status"); s.textContent = text; s.classList.toggle("warn", warn); }
+
+  // Paper
+  const paperSeg = document.getElementById("paper");
+  paperSeg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    for (const x of paperSeg.children) x.setAttribute("aria-pressed", String(x === b));
+    if (b.dataset.paper) bench.dataset.paper = b.dataset.paper; else delete bench.dataset.paper;
+    const z = document.getElementById("zoom"); if (b.dataset.paper) z.dataset.paper = b.dataset.paper; else delete z.dataset.paper;
+    try { localStorage.setItem("paper", b.dataset.paper); } catch {}
+  });
+
+  function restart(root) { for (const svg of root.querySelectorAll("svg")) svg.replaceWith(svg.cloneNode(true)); }
+  document.getElementById("replay").addEventListener("click", () => restart(bench));
+
+  // Zoom
+  const dlg = document.getElementById("zoom");
+  dlg.classList.add("bench");
+  function zoom(item) {
+    document.getElementById("zoom-id").textContent = `${item.id} · ${item.kb.toFixed(1)} KB · ${item.budget.toFixed(2)}× budget`;
+    document.getElementById("zoom-big").innerHTML = svgFor(item, serial++);
+    dlg.showModal();
+  }
+  document.getElementById("zoom-close").addEventListener("click", () => dlg.close());
+  document.getElementById("zoom-replay").addEventListener("click", () => restart(dlg));
+  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+
+  build();
+  try { const p = localStorage.getItem("paper"); if (p) paperSeg.querySelector(`[data-paper="${p}"]`)?.click(); } catch {}
+  bench.addEventListener("input", e => { if (e.target.tagName === "TEXTAREA") e.target.dataset.dirty = "1"; });
+  paint();
+
+  (async () => {
+    db = window.claude ? await claude.use("db") : null;
+    const user = window.claude ? await claude.use("user") : null;
+    canWrite = !!db && (user ? await user.isOwner() : false);
+    if (!db) { status("Decisions can't be saved or shown in this view. The initials are all here to look at."); paint(); return; }
+    let first = true;
+    const timer = setTimeout(() => status("Saved decisions can't be reached yet; what you see may be incomplete.", true), 10000);
+    const done = () => { if (first) { first = false; clearTimeout(timer); status(canWrite ? "Your decisions save as you make them. Press a chosen verdict again to clear it." : "Showing the curator's decisions; only the page's owner can change them."); } };
+    db.collection("verdicts").onSnapshot(snap => {
+      for (const k of Object.keys(verdicts)) delete verdicts[k];
+      for (const d of snap.docs) { const v = d.data()?.verdict; if (v) verdicts[d.id] = v; }
+      if (!snap.metadata.fromCache) done(); paint();
+    }, e => { clearTimeout(timer); status(`Saved decisions can't be read (${e.code}).`, true); });
+    db.collection("sets").onSnapshot(snap => {
+      for (const d of snap.docs) sets[d.id] = d.data();
+      paint();
+    }, () => {});
+    paint();
+  })();
+})();
+</script>

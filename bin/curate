@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Make a run's curation page: every finished initial as the dropcap of an
+opening paragraph from levineuwirth.org, at the site's size (23 px
+Spectral, three lines) and with its drawing-in, beside Keep and Reject,
+and a judgment of each route as a set. The page (lib/curate.html) keeps
+the decisions in its artifact's database: verdicts/<id>, sets/<route>.
+
+Writes out/runs/NAME/curate.html, to publish as an artifact.
+
+Usage: curate NAME [--title TITLE]
+"""
+
+import argparse
+import html
+import json
+import sys
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+import run
+
+# Opening paragraphs from the site's essays, one per letter, so an initial
+# is judged where it would stand.
+TEXT = {
+    "A": ("essays/branch-based-local-capture-in-tree-balls",
+          "An induced tree-ball does not control shortest paths between arbitrary pairs of its "
+          "vertices: a competing path may leave the ball and re-enter. The required radius depends "
+          "on the endpoint depths and on the length of their path inside the tree-ball."),
+    "F": ("essays/ball-occupation-under-coarse-projections",
+          "For degree zero or one, use a singleton cloud, serving as the external port in the "
+          "degree-one case. Each round replaces every vertex according to its current degree, "
+          "including vertices of degree two or three. For degree reduction, stop when the entire "
+          "graph is subcubic."),
+    "I": ("essays/asymmetric-forgetting",
+          "I have deliberately chosen not to describe what a concept-first curriculum would look "
+          "like. This is a separate piece of work that is owed its own diligent treatment, and I "
+          "refuse to attempt to distill and collapse it into the closing of this one."),
+    "O": ("essays/crawler_chronicles",
+          "Only aggregate results and sanitized publication records are public. Raw access logs, "
+          "addresses, individual user-agent strings and request sequences remained on the VPS. A "
+          "user-agent cohort is a traffic classification, not a verified person or organization."),
+    "S": ("essays/verified-inference",
+          "Streaming solves a memory problem by creating a regeneration problem. The model and its "
+          "auxiliaries are revisited across proof stages. At small context lengths, loading and "
+          "converting the weights can dominate even when little token computation is required."),
+    "W": ("essays/asymmetric-forgetting",
+          "Where do I land amidst all of this, and why do I care? I offer my own retention audit of "
+          "sorts not as proof of the mechanism, but as a demonstration that it is at least "
+          "observable in lived form."),
+}
+
+ROUTES = [
+    {"key": "whole", "title": "Whole initials", "short": "whole initials",
+     "note": "Letter and ornament both drawn by the model."},
+    {"key": "ornament", "title": "Ornament only", "short": "ornament-only initials",
+     "note": "Spectral SemiBold's capital kept; the model drew the rest."},
+]
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("name")
+    ap.add_argument("--title")
+    a = ap.parse_args()
+    spec = run.load(a.name)
+    out = ROOT / "out" / "runs" / spec["name"]
+    measures = {m["id"]: m for m in json.loads((out / "finished" / "measures.json").read_text())}
+    reqs = [r for r in run.requests(spec).values() if r["state"] == "saved"]
+    items = []
+    for r in sorted(reqs, key=lambda r: (r["route"], r["letter"], r["attempt"])):
+        m = measures[r["id"]]
+        items.append({"id": r["id"], "route": r["route"], "letter": r["letter"], "attempt": r["attempt"],
+                      "kb": m["path_bytes"] / 1000, "budget": m["budget"],
+                      "svg": (out / "finished" / f"{r['id']}.svg").read_text()})
+    models = sorted({r["model"] for r in reqs})
+    days = sorted({r["at"]["sent"][:10] for r in reqs})
+    letters = [c for c in spec["letters"] if any(i["letter"] == c for i in items)]
+    title = a.title or f"{spec['name']} curation"
+    lede = (f"{len(items)} initials drawn by {', '.join(models)} on {', '.join(days)}: "
+            f"{spec['attempts']} attempts at each of {len(letters)} letters by each route, all cut with "
+            "the trial's fixed finishing. Each opens a paragraph from levineuwirth.org at the site's "
+            "size, 23 px Spectral and three lines tall, and draws itself in as it does there. "
+            "Click an initial to enlarge it.")
+    data = {"routes": [r for r in ROUTES if r["key"] in spec["routes"]], "letters": letters,
+            "items": items, "text": {c: TEXT[c][1] for c in letters},
+            "sources": {c: TEXT[c][0] for c in letters}}
+    page = (ROOT / "lib" / "curate.html").read_text()
+    page = (page.replace("__TITLE__", html.escape(title)).replace("__LEDE__", html.escape(lede))
+            .replace("__DATA__", json.dumps(data).replace("</", "<\\/")))
+    (out / "curate.html").write_text(page)
+    print(f"{out / 'curate.html'}: {len(items)} initials, {len(page) / 1e6:.1f} MB")
+
+
+if __name__ == "__main__":
+    main()

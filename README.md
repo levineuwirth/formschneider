@@ -117,6 +117,7 @@ bin/generate pilot-openai        # plan only: what would be sent, and its inputs
 bin/generate pilot-openai --go --limit 4   # send four (keys from .env); stops at an error
 bin/finish pilot-openai          # put back, cut, measure: out/runs/pilot-openai/finished/
 bin/archive pilot-openai         # pictures, inputs and record in one checked archive
+bin/curate pilot-openai          # a curation page to publish: keep or reject each, judge each set
 ```
 
 ## Running
