@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""Put the author's decisions from a run's curation page (bin/curate) into
+git, beside the record.
+
+The page keeps them in its artifact's database. Exported from there, they
+are DIR/verdicts/<id>.json, {verdict, at}, and DIR/sets/<route>.json,
+{judgment, note, at}. Each is checked against the record and the spec:
+every verdict must name a saved picture and every saved picture must have
+one, and every set judgment must name a route of the run. Writes
+runs/NAME/verdicts.jsonl, sorted, one line per initial (id, route,
+letter, attempt, verdict, at), then one per route (route, judgment, note,
+at), so the same decisions always write the same file.
+
+Usage: verdicts NAME DIR
+"""
+
+import json
+import sys
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+import run
+
+VERDICTS = {"keep", "reject"}
+JUDGMENTS = {"yes", "partly", "no"}
+
+
+def docs(folder: File) -> dict[str, dict]:
+    return {f.stem: json.loads(f.read_text()) for f in sorted(folder.glob("*.json"))}
+
+
+def main() -> None:
+    spec = run.load(sys.argv[1])
+    src = File(sys.argv[2])
+    saved = {r["id"]: r for r in run.requests(spec).values() if r["state"] == "saved"}
+    verdicts, sets = docs(src / "verdicts"), docs(src / "sets")
+    if stray := sorted(set(verdicts) - set(saved)):
+        sys.exit(f"verdicts on pictures the record has not saved: {', '.join(stray)}")
+    if missing := sorted(set(saved) - set(verdicts)):
+        sys.exit(f"{len(missing)} saved pictures have no verdict: {', '.join(missing)}")
+    if odd := sorted(i for i, v in verdicts.items() if v.get("verdict") not in VERDICTS):
+        sys.exit(f"verdicts neither keep nor reject: {', '.join(odd)}")
+    if stray := sorted(set(sets) - set(spec["routes"])):
+        sys.exit(f"set judgments on routes the run does not have: {', '.join(stray)}")
+    if odd := sorted(k for k, s in sets.items() if s.get("judgment") not in JUDGMENTS):
+        sys.exit(f"set judgments neither yes, partly nor no: {', '.join(odd)}")
+    lines = []
+    for i in sorted(verdicts):
+        r, v = saved[i], verdicts[i]
+        lines.append({"kind": "initial", "id": i, "route": r["route"], "letter": r["letter"],
+                      "attempt": r["attempt"], "verdict": v["verdict"], "at": v["at"]})
+    for k in sorted(sets):
+        s = sets[k]
+        lines.append({"kind": "set", "route": k, "judgment": s["judgment"],
+                      "note": s.get("note", ""), "at": s["at"]})
+    out = ROOT / "runs" / spec["name"] / "verdicts.jsonl"
+    out.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines))
+    for route in spec["routes"]:
+        mine = [x for x in lines if x["kind"] == "initial" and x["route"] == route]
+        kept = sum(x["verdict"] == "keep" for x in mine)
+        judged = sets.get(route, {}).get("judgment", "not judged")
+        print(f"{route}: {kept} of {len(mine)} kept; as a set: {judged}")
+    print(out)
+
+
+if __name__ == "__main__":
+    main()
