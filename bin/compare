@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Make a run's comparison page: every kept initial over budget at the
+trial's tolerance, shown at each tolerance on the fit's ladder from that
+one to the fitted one, toggled in place at the site's size and drawing,
+and enlarged with where its outline differs from the judged cut. The
+author keeps it at one of them, the fitted one or a tighter one over
+budget when smoothing damaged it, or finds it no longer a keeper. The
+page (lib/compare.html) keeps the choices in its artifact's database:
+choices/<id> = {verdict: keep | reject, tolerance}.
+
+Reads the finished measures (bin/finish, for the fitted tolerance), the
+sweep (bin/sweep, for every version and how far it moves) and the
+author's verdicts (runs/NAME/verdicts.jsonl). Writes
+out/runs/NAME/compare.html, to publish as an artifact.
+
+Usage: compare NAME [--title TITLE]
+"""
+
+import argparse
+import html
+import json
+import sys
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+import run
+from finish import BUDGET, FINISH, LADDER
+from specimens import ROUTES, TEXT, page as fill
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("name")
+    ap.add_argument("--title")
+    a = ap.parse_args()
+    spec = run.load(a.name)
+    out = ROOT / "out" / "runs" / spec["name"]
+    finished = {m["id"]: m for m in json.loads((out / "finished" / "measures.json").read_text())}
+    sweep = {(m["id"], m["tolerance"]): m for m in json.loads((out / "sweep" / "measures.json").read_text())}
+    verdicts = [json.loads(x) for x in (ROOT / "runs" / spec["name"] / "verdicts.jsonl").read_text().splitlines()]
+    kept = sorted(x["id"] for x in verdicts if x["kind"] == "initial" and x["verdict"] == "keep")
+    base = FINISH["tolerance"]
+    items = []
+    for i in kept:
+        m = finished[i]
+        if m["path_bytes"] <= BUDGET:
+            continue
+        fit = m["fit_tolerance"]
+        if sweep.get((i, fit), {}).get("path_bytes") != m["fit_path_bytes"]:
+            sys.exit(f"{i}: the sweep is not of this finishing; run bin/sweep again")
+        versions = []
+        for t in (t for t in LADDER if t <= fit):
+            s = sweep[i, t]
+            versions.append({"t": t, "bytes": s["path_bytes"], "budget": s["path_bytes"] / BUDGET,
+                             "fits": s["path_bytes"] <= BUDGET, "px99": s["px99"], "pxmax": s["pxmax"],
+                             "svg": (out / "sweep" / f"t{t:g}" / f"{i}.svg").read_text()})
+        items.append({"id": i, "route": m["route"], "letter": m["letter"], "attempt": m["attempt"],
+                      "fit": fit, "fits": m["fit_path_bytes"] <= BUDGET, "versions": versions})
+    items.sort(key=lambda x: ([r["key"] for r in ROUTES].index(x["route"]), x["letter"], x["attempt"]))
+    letters = sorted({x["letter"] for x in items})
+    title = a.title or f"{spec['name']} fitted cuts"
+    lede = (f"The {len(items)} initials you kept that are over budget at tolerance {base}, the trial's, "
+            f"each shown at the tightest tolerance that fits the budget and at every tolerance on the "
+            f"way there ({', '.join(f'{t:g}' for t in LADDER)}; {LADDER[-1]:g} the cap). Each opens a "
+            "paragraph at the site's size, 91 CSS px tall, and draws itself in; switching versions "
+            "shows the new one at once. Keep each at the version you would put on the site, a tighter "
+            "one over budget if smoothing damaged it, or say it is no longer a keeper. Click an "
+            "initial to enlarge it and see where its outline differs from the cut you judged.")
+    data = {"routes": ROUTES, "items": items, "base": base,
+            "text": {c: TEXT[c][1] for c in letters}}
+    page = fill("compare.html", TITLE=html.escape(title), LEDE=html.escape(lede),
+                DATA=json.dumps(data).replace("</", "<\\/"))
+    (out / "compare.html").write_text(page)
+    print(f"{out / 'compare.html'}: {len(items)} initials, "
+          f"{sum(len(x['versions']) for x in items)} versions, {len(page) / 1e6:.1f} MB")
+
+
+if __name__ == "__main__":
+    main()

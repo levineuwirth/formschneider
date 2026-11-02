@@ -43,12 +43,13 @@ from PIL import Image
 
 from bench import contact
 from canvas import Layout, letter_canvas, png, put_back, references
-from finish import FINISH, cut, measures
+from finish import BUDGET, FINISH, fitted, measures, traced
 from fonts import EBGI, SPECTRAL
-from initial import initial_svg
+from initial import initial_svg, measure
 from letter import capital
 from model import Request, error_fields
 from raster import bare_svg, rasterize
+from simplify import simplify
 
 ROOT = File(__file__).resolve().parent.parent
 ROUTES = ("whole", "ornament")
@@ -243,31 +244,49 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
     return todo
 
 
+def picture(out: File, r: dict) -> Image.Image:
+    """A saved request's picture as finishing takes it, checked against the
+    record, with the letter put back (ornament route) from the inputs kept
+    when it was sent."""
+    data = (out / r["output"]["file"]).read_bytes()
+    if _sha(data) != r["output"]["sha256"]:
+        raise SystemExit(f"{r['id']}: the picture is not the one the record says was made")
+    gray = Image.open(io.BytesIO(data)).convert("L")
+    if r["route"] == "ornament":
+        i = r["inputs"]
+        canvas = _kept(out, i["canvas"]).convert("L")
+        editable = np.asarray(_kept(out, i["editable"])).astype(bool)
+        gray = put_back(gray, canvas, editable, Layout(tuple(r["size"]), tuple(i["block"]),
+                                                       tuple(i["box"])))
+    return gray
+
+
 def finish(spec: dict, root: File = ROOT, out: File | None = None) -> list[dict]:
     """Every picture the run has made, through the fixed finishing: the
     letter put back (ornament route) from the inputs kept when it was sent,
     cropped to its block, cut, written as the site would hold it, measured,
-    and laid out on a contact sheet. Everything comes from the record and
-    the files it names, checked; nothing from the spec as it is now."""
+    and laid out on a contact sheet; and cut again fitted to the budget
+    (finished/fitted/), with the tolerance the fit took. Everything comes
+    from the record and the files it names, checked; nothing from the spec
+    as it is now."""
     out = out or root / "out" / "runs" / spec["name"]
     (out / "finished").mkdir(parents=True, exist_ok=True)
     rows, cells = [], {}
     for r in (r for r in requests(spec, root).values() if r["state"] == "saved"):
-        data = (out / r["output"]["file"]).read_bytes()
-        if _sha(data) != r["output"]["sha256"]:
-            raise SystemExit(f"{r['id']}: the picture is not the one the record says was made")
-        gray = Image.open(io.BytesIO(data)).convert("L")
-        if r["route"] == "ornament":
-            i = r["inputs"]
-            canvas = _kept(out, i["canvas"]).convert("L")
-            editable = np.asarray(_kept(out, i["editable"])).astype(bool)
-            gray = put_back(gray, canvas, editable, Layout(tuple(r["size"]), tuple(i["block"]),
-                                                           tuple(i["box"])))
-        path, box = cut(gray)
+        gray = picture(out, r)
+        raw, box = traced(gray)
+        path = simplify(raw, FINISH["tolerance"])
         svg = initial_svg(path, box, credit(spec, r))
         (out / "finished" / f"{r['id']}.svg").write_text(svg)
+        fit, t = fitted(raw)
+        fit_svg = initial_svg(fit, box, credit(spec, r, FINISH | {"tolerance": t}))
+        (out / "finished" / "fitted").mkdir(exist_ok=True)
+        (out / "finished" / "fitted" / f"{r['id']}.svg").write_text(fit_svg)
+        fit_bytes = measure(fit, fit_svg)["path_bytes"]
         row = {"id": r["id"], "route": r["route"], "model": r["model"], "letter": r["letter"],
-               "attempt": r["attempt"], **measures(gray, path, box, svg)}
+               "attempt": r["attempt"], **measures(gray, path, box, svg), "box": list(box),
+               "fit_tolerance": t, "fit_path_bytes": fit_bytes,
+               "fit_budget": round(fit_bytes / BUDGET, 3)}
         rows.append(row)
         cells.setdefault(r["letter"], []).append(
             (f"{r['route'][0]}{r['attempt']} {row['path_bytes'] / 1000:.0f} KB ×{row['budget']:.1f}",
@@ -279,9 +298,9 @@ def finish(spec: dict, root: File = ROOT, out: File | None = None) -> list[dict]
     return rows
 
 
-def credit(spec: dict, r: dict) -> str:
+def credit(spec: dict, r: dict, finish: dict = FINISH) -> str:
     who = f"{r['model']} ({r['provider']})"
     what = (f"ornament drawn by {who} around {r['inputs']['letter']}'s capital "
             f"(SIL Open Font License 1.1)" if r["route"] == "ornament" else f"drawn by {who}")
     return (f"{r['letter']}, {what}; formschneider {spec['name']}/{r['id']}, "
-            f"{r['at']['sent'][:10]}. {r.get('terms') or ''} Cut: {FINISH}.").replace("--", "–")
+            f"{r['at']['sent'][:10]}. {r.get('terms') or ''} Cut: {finish}.").replace("--", "–")

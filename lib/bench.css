@@ -1,0 +1,81 @@
+/* The bench both pages share (bin/curate, bin/compare): the site's own
+   paper and type for the specimens, a quiet sans for the controls. */
+:root {
+  --bg: #faf8f4; --fg: #1a1a1a; --faint: #6e6a64; --rule: #e2dcd2; --well: #f1ede6;
+  --keep: #2f6b3a; --keep-bg: #e3efe4; --reject: #8f2d2d; --reject-bg: #f4e2df; --focus: #2b4a6f;
+  --serif: "Spectral", Georgia, "Times New Roman", serif;
+  --sans: "Fira Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  /* the site's paper, light (engine/static/css/base.css) */
+  --p-bg: #faf8f4; --p-text: #1a1a1a; --p-glow: drop-shadow(0 0 0.28em rgba(150, 105, 40, 0.30));
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121212; --fg: #d4d0c8; --faint: #8b8680; --rule: #2c2a27; --well: #1a1918;
+  --keep: #8cc497; --keep-bg: #1f2e22; --reject: #e09a92; --reject-bg: #3a2220; --focus: #9db7d6;
+  --p-bg: #121212; --p-text: #d4d0c8; --p-glow: drop-shadow(0 0 0.3em rgba(235, 200, 140, 0.28));
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121212; --fg: #d4d0c8; --faint: #8b8680; --rule: #2c2a27; --well: #1a1918;
+  --keep: #8cc497; --keep-bg: #1f2e22; --reject: #e09a92; --reject-bg: #3a2220; --focus: #9db7d6;
+  --p-bg: #121212; --p-text: #d4d0c8; --p-glow: drop-shadow(0 0 0.3em rgba(235, 200, 140, 0.28));
+  color-scheme: dark }
+/* a paper chosen on the page overrides the viewer's theme for the specimens */
+.bench[data-paper="light"] { --p-bg: #faf8f4; --p-text: #1a1a1a; --p-glow: drop-shadow(0 0 0.28em rgba(150, 105, 40, 0.30)); }
+.bench[data-paper="dark"] { --p-bg: #121212; --p-text: #d4d0c8; --p-glow: drop-shadow(0 0 0.3em rgba(235, 200, 140, 0.28)); }
+.bench[data-paper="cappuccino"] { --p-bg: #553a28; --p-text: #ead0a0; --p-glow: drop-shadow(0 0 0.3em rgba(255, 216, 150, 0.34)); }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 88rem; margin: 0 auto; padding-block: 2rem 4rem; display: grid; gap: 2.5rem; }
+header { display: grid; gap: 0.75rem; max-width: 60rem; }
+h1 { font: 600 2rem/1.15 var(--serif); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.5rem/1.2 var(--serif); margin: 0; }
+.lede { margin: 0; color: var(--faint); max-width: 62ch; }
+.lede code, .mono { font-family: var(--mono); font-size: 0.82em; }
+.tally { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-variant-numeric: tabular-nums; }
+.tally b { font-weight: 500; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; padding-block: 0.75rem;
+  border-block: 1px solid var(--rule); position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.seg button { font: 500 0.8rem var(--sans); letter-spacing: 0.02em; padding: 0.35rem 0.7rem; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--well); box-shadow: inset 0 -2px 0 var(--focus); }
+.label { font: 500 0.72rem var(--sans); text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+.btn { font: 500 0.82rem var(--sans); padding: 0.4rem 0.8rem; border: 1px solid var(--rule); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.note { color: var(--faint); font-size: 0.85rem; }
+.note.warn { color: var(--reject); }
+
+/* The specimen: a paragraph as the site sets it, 23 px Spectral at 1.65,
+   its initial three lines tall (engine/static/css/typography.css, section 4). */
+.paper { background: var(--p-bg); color: var(--p-text); border-radius: 6px; padding: 0.9rem 1rem; overflow: hidden; }
+.page-p { --line-height: 1.65; font: 23px/1.65 var(--serif); margin: 0; hyphens: auto; max-width: 40rem;
+  max-height: calc(4 * 1.65em); overflow: hidden; }
+.initial { --initial-lines: 3; --initial-cap: 0.66em; --initial-rise: 0.298em; display: block; float: left;
+  height: calc((var(--initial-lines) - 1) * var(--line-height) * 1em + var(--initial-cap));
+  margin: calc(0.5 * var(--line-height) * 1em + var(--initial-rise) - var(--initial-cap)) 0.22em 0 0;
+  color: var(--p-text); filter: var(--p-glow, none); cursor: zoom-in; border: 0; padding: 0; background: none;
+  font: inherit; line-height: inherit; /* a button does not inherit the paragraph's size, and the box is in em */ }
+.initial svg { display: block; height: 100%; width: auto; overflow: visible; }
+.initial .initial-cut:not(.initial-growth) { vector-effect: non-scaling-stroke; }
+@media (prefers-reduced-motion: no-preference) {
+  .initial .initial-cut { stroke-dasharray: 1; stroke-dashoffset: 1; animation: initial-cut var(--d, 0.7s) ease-out var(--t, 0s) forwards; }
+  .initial .initial-ink, .initial .initial-shade { opacity: 0; animation: initial-ink var(--d, 0.5s) ease var(--t, 1s) forwards; }
+}
+@keyframes initial-cut { to { stroke-dashoffset: 0; } }
+@keyframes initial-ink { to { opacity: 1; } }
+
+dialog { border: 1px solid var(--rule); border-radius: 10px; padding: 0; max-width: min(92vw, 56rem); background: var(--bg); color: var(--fg); }
+dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.zoom { display: grid; gap: 0.75rem; padding: 1rem; }
+.zoom .paper { display: grid; place-items: center; padding: 1.5rem; }
+.zoom .big { color: var(--p-text); filter: var(--p-glow, none); height: min(62vh, 34rem); }
+.zoom .big svg { height: 100%; width: auto; display: block; overflow: visible; }
+.zoom .big .initial-cut:not(.initial-growth) { vector-effect: non-scaling-stroke; }
+@media (prefers-reduced-motion: no-preference) {
+  .zoom .big .initial-cut { stroke-dasharray: 1; stroke-dashoffset: 1; animation: initial-cut var(--d, 0.7s) ease-out var(--t, 0s) forwards; }
+  .zoom .big .initial-ink, .zoom .big .initial-shade { opacity: 0; animation: initial-ink var(--d, 0.5s) ease var(--t, 1s) forwards; }
+}
+.zoom .bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; align-items: center; }
+@media (max-width: 30rem) { .letter-row { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 1.6rem; } }

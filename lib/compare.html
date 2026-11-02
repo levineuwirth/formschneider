@@ -1,0 +1,320 @@
+<title>__TITLE__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Fira+Sans:wght@400;500&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+__BENCH_CSS__
+/* One card per kept initial over budget: its versions from the trial's cut
+   to the fitted one, one shown at a time, and the choice of which to keep. */
+section.route { display: grid; gap: 1.5rem; }
+.route-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 1rem; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr)); gap: 1.25rem 1.5rem; }
+.card { display: grid; gap: 0.55rem; min-width: 0; margin: 0; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--rule); }
+.card[data-verdict="keep"] { border-color: var(--keep); background: var(--keep-bg); }
+.card[data-verdict="reject"] { border-color: var(--reject); background: var(--reject-bg); }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.card-head b { font: 600 1.15rem var(--serif); }
+.versions { display: flex; flex-wrap: wrap; }
+.versions button { display: grid; gap: 0.05rem; text-align: left; font-variant-numeric: tabular-nums; padding: 0.3rem 0.6rem; }
+.versions button small { font: 0.7rem var(--mono); color: var(--faint); letter-spacing: 0; }
+.versions button.over small { color: var(--reject); }
+.versions button .fit { color: var(--keep); }
+.meta { font: 0.78rem var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+.choice { display: flex; gap: 0.4rem; }
+.choice button { flex: 1; font: 500 0.82rem var(--sans); padding: 0.4rem 0.2rem; border-radius: 6px; border: 1px solid var(--rule); background: var(--bg); color: var(--fg); cursor: pointer; }
+.choice button[data-v="keep"][aria-pressed="true"] { background: var(--keep); border-color: var(--keep); color: var(--bg); }
+.choice button[data-v="reject"][aria-pressed="true"] { background: var(--reject); border-color: var(--reject); color: var(--bg); }
+.choice button:disabled { cursor: default; opacity: 0.55; }
+.chosen { font-size: 0.85rem; min-height: 1.3em; }
+.card[data-verdict="keep"] .chosen { color: var(--keep); }
+.card[data-verdict="reject"] .chosen { color: var(--reject); }
+/* a switched version shows at once, drawn; Replay draws it in again */
+.still .initial-cut { animation: none !important; stroke-dasharray: none !important; stroke-dashoffset: 0 !important; }
+.still .initial-ink, .still .initial-shade { animation: none !important; opacity: 1 !important; }
+/* changes against the trial's cut, always on white so the colors read */
+.zoom .paper.diff { background: #fff; }
+.zoom .paper.diff .big { filter: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.82rem; color: var(--faint); }
+.legend i { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; vertical-align: -0.05em; margin-right: 0.3em; }
+.zoom .controls { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+.toggle { display: inline-flex; gap: 0.4rem; align-items: center; font-size: 0.85rem; cursor: pointer; }
+</style>
+
+<main>
+  <header>
+    <h1>__TITLE__</h1>
+    <p class="lede">__LEDE__</p>
+    <div class="tally" id="tally" aria-live="polite"></div>
+    <p class="note" id="status">Loading saved choices…</p>
+  </header>
+
+  <div class="toolbar">
+    <span class="label">Paper</span>
+    <span class="seg" id="paper" role="group" aria-label="Paper">
+      <button type="button" data-paper="" aria-pressed="true">Your theme</button>
+      <button type="button" data-paper="light" aria-pressed="false">Light</button>
+      <button type="button" data-paper="dark" aria-pressed="false">Dark</button>
+      <button type="button" data-paper="cappuccino" aria-pressed="false">Cappuccino</button>
+    </span>
+    <span class="label">Show</span>
+    <span class="seg" id="all" role="group" aria-label="Show every card at">
+      <button type="button" data-all="base" aria-pressed="false">All at tolerance 2</button>
+      <button type="button" data-all="fit" aria-pressed="true">All fitted</button>
+    </span>
+    <button type="button" class="btn" id="replay">Replay drawing</button>
+  </div>
+
+  <div class="bench" id="bench"></div>
+</main>
+
+<dialog id="zoom" aria-label="Initial, enlarged">
+  <div class="zoom">
+    <div class="bar"><span class="mono" id="zoom-id"></span>
+      <span class="row"><button type="button" class="btn" id="zoom-replay">Replay</button>
+      <button type="button" class="btn" id="zoom-close">Close</button></span></div>
+    <div class="controls">
+      <span class="seg versions" id="zoom-versions" role="group" aria-label="Version"></span>
+      <label class="toggle"><input type="checkbox" id="zoom-diff"> Show changes against tolerance 2</label>
+    </div>
+    <p class="legend" id="zoom-legend" hidden><span><i style="background:#111"></i>in both</span>
+      <span><i style="background:#d8342c"></i>only at tolerance 2: lost</span>
+      <span><i style="background:#2f62d8"></i>only in this version: added</span></p>
+    <div class="paper" id="zoom-paper"><div class="big" id="zoom-big"></div></div>
+    <p class="meta" id="zoom-meta"></p>
+  </div>
+</dialog>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+(() => {
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const ROUTES = DATA.routes, ITEMS = DATA.items, TEXT = DATA.text, BASE = DATA.base;
+  const bench = document.getElementById("bench");
+  const choices = {}, shown = {};
+  let db = null, canWrite = false;
+  const busy = new Set();
+  let serial = 0;
+
+  // each SVG declares id="initial-ink"; on one page they must differ, as the site's filter makes them
+  const svgOf = svg => { const n = serial++; return svg.replaceAll('id="initial-ink"', `id="ink-${n}"`).replaceAll("url(#initial-ink)", `url(#ink-${n})`); };
+  const ver = (item, t) => item.versions.find(v => v.t === t);
+  const tol = t => `tolerance ${t}`;
+  const fixed = x => x.toFixed(2);
+  // a ratio just over budget would round to a red 1.00; show it to the place that tells
+  const ratio = v => (v.fits || v.budget.toFixed(2) !== "1.00") ? v.budget.toFixed(2) : v.budget.toFixed(4).replace(/0+$/, "");
+
+  function el(tag, attrs = {}, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+    }
+    for (const k of kids) if (k) e.append(k);
+    return e;
+  }
+
+  function versionButtons(item, onPick) {
+    const seg = el("span", { class: "seg versions", role: "group", "aria-label": `Version of ${item.id}` });
+    for (const v of item.versions) {
+      const b = el("button", { type: "button", "data-t": String(v.t), "aria-pressed": "false", class: v.fits ? "" : "over" });
+      const label = v.t === BASE ? `t${v.t} · judged` : `t${v.t}`;
+      b.append(el("span", { text: label }));
+      const small = el("small", { text: `${ratio(v)}×` });
+      if (v.t === item.fit && v.fits) small.append(el("span", { class: "fit", text: " fits" }));
+      b.append(small);
+      b.addEventListener("click", () => onPick(v.t));
+      seg.append(b);
+    }
+    return seg;
+  }
+
+  function metaText(item, v) {
+    const size = `${(v.bytes / 1000).toFixed(1)} KB, ${ratio(v)}× budget${v.fits ? "" : " (over)"}`;
+    if (v.t === BASE) return `${tol(v.t)}, the cut you judged · ${size}`;
+    return `${tol(v.t)} · ${size} · moves from t${BASE}: 99% within ${fixed(v.px99)} px, at most ${fixed(v.pxmax)} px (CSS px on the page)`;
+  }
+
+  function card(item) {
+    const fig = el("figure", { class: "card", "data-id": item.id });
+    const p = el("p", { class: "page-p" });
+    const ini = el("button", { class: "initial", type: "button", "aria-label": `Enlarge ${item.id}` });
+    ini.addEventListener("click", () => zoom(item));
+    p.append(ini, document.createTextNode(TEXT[item.letter].slice(1)));
+    const head = el("div", { class: "card-head" }, el("b", { text: `${item.letter}, attempt ${item.attempt}` }),
+      el("span", { class: "note", text: item.fits ? `fits at t${item.fit}` : `over budget even at t${item.fit}` }));
+    const seg = versionButtons(item, t => show(item.id, t, true));
+    const meta = el("div", { class: "meta" });
+    const keep = el("button", { type: "button", "data-v": "keep", "aria-pressed": "false" });
+    const reject = el("button", { type: "button", "data-v": "reject", "aria-pressed": "false", text: "No longer a keeper" });
+    keep.addEventListener("click", () => choose(item.id, "keep"));
+    reject.addEventListener("click", () => choose(item.id, "reject"));
+    fig.append(head, el("div", { class: "paper" }, p), seg, meta,
+      el("div", { class: "choice", role: "group", "aria-label": `Choice for ${item.id}` }, keep, reject),
+      el("div", { class: "chosen", "aria-live": "polite" }));
+    return fig;
+  }
+
+  // show one version on a card; a switch shows it at once, already drawn
+  function show(id, t, still) {
+    const item = ITEMS.find(i => i.id === id), v = ver(item, t);
+    shown[id] = t;
+    const fig = bench.querySelector(`.card[data-id="${id}"]`);
+    const ini = fig.querySelector(".initial");
+    ini.innerHTML = svgOf(v.svg);
+    ini.classList.toggle("still", !!still);
+    for (const b of fig.querySelectorAll(".versions button")) b.setAttribute("aria-pressed", String(+b.dataset.t === t));
+    fig.querySelector(".meta").textContent = metaText(item, v);
+    paintCard(fig);
+  }
+
+  function paintCard(fig) {
+    const id = fig.dataset.id, item = ITEMS.find(i => i.id === id), c = choices[id], t = shown[id];
+    fig.dataset.verdict = c ? c.verdict : "";
+    const keep = fig.querySelector('[data-v="keep"]'), reject = fig.querySelector('[data-v="reject"]');
+    keep.textContent = `Keep at t${t}`;
+    keep.setAttribute("aria-pressed", String(!!c && c.verdict === "keep" && c.tolerance === t));
+    reject.setAttribute("aria-pressed", String(!!c && c.verdict === "reject"));
+    keep.disabled = reject.disabled = !canWrite || busy.has(id);
+    let said = "";
+    if (c && c.verdict === "keep") {
+      const v = ver(item, c.tolerance);
+      said = `Kept at t${c.tolerance}, ${ratio(v)}× budget${v.fits ? "" : ", over budget"}.`;
+      if (c.tolerance !== t) said += ` Showing t${t}.`;
+    } else if (c && c.verdict === "reject") said = "No longer a keeper.";
+    fig.querySelector(".chosen").textContent = said;
+  }
+
+  function paint() {
+    for (const fig of bench.querySelectorAll(".card")) paintCard(fig);
+    const all = ITEMS.map(i => choices[i.id]).filter(Boolean);
+    const kept = all.filter(c => c.verdict === "keep");
+    const within = kept.filter(c => ver(ITEMS.find(i => i.id === c.id), c.tolerance).fits).length;
+    document.getElementById("tally").replaceChildren(
+      el("span", {}, el("b", { text: "Decided: " }), document.createTextNode(`${all.length} of ${ITEMS.length}`)),
+      el("span", {}, el("b", { text: "Kept within budget: " }), document.createTextNode(String(within))),
+      el("span", {}, el("b", { text: "Kept over budget: " }), document.createTextNode(String(kept.length - within))),
+      el("span", {}, el("b", { text: "No longer keepers: " }), document.createTextNode(String(all.length - kept.length))));
+  }
+
+  function build() {
+    for (const route of ROUTES) {
+      const mine = ITEMS.filter(i => i.route === route.key);
+      if (!mine.length) continue;
+      const sec = el("section", { class: "route" });
+      sec.append(el("div", { class: "route-head" }, el("h2", { text: route.title }),
+        el("span", { class: "note", text: `${mine.length} kept initials over budget at tolerance ${BASE}` })));
+      const cards = el("div", { class: "cards" });
+      for (const item of mine) cards.append(card(item));
+      sec.append(cards);
+      bench.append(sec);
+    }
+    for (const item of ITEMS) show(item.id, item.fit, false);
+  }
+
+  async function choose(id, verdict) {
+    if (!db || !canWrite || busy.has(id)) return;
+    const t = shown[id], c = choices[id];
+    const same = c && c.verdict === verdict && (verdict === "reject" || c.tolerance === t);
+    const next = same ? null : { verdict, tolerance: verdict === "keep" ? t : null };   // pressing the chosen one again clears it
+    busy.add(id); paint();
+    try {
+      const ref = db.doc(`choices/${id}`);
+      if (next) await ref.set({ ...next, at: new Date().toISOString() }); else await ref.delete();
+      if (next) choices[id] = { id, ...next }; else delete choices[id];
+    } catch (e) {
+      status(`That choice was not saved (${e && e.code || "error"}). Try again.`, true);
+    } finally { busy.delete(id); paint(); }
+  }
+
+  function status(text, warn = false) { const s = document.getElementById("status"); s.textContent = text; s.classList.toggle("warn", warn); }
+
+  // Paper
+  const paperSeg = document.getElementById("paper"), dlg = document.getElementById("zoom");
+  dlg.classList.add("bench");
+  paperSeg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    for (const x of paperSeg.children) x.setAttribute("aria-pressed", String(x === b));
+    for (const root of [bench, dlg]) if (b.dataset.paper) root.dataset.paper = b.dataset.paper; else delete root.dataset.paper;
+    try { localStorage.setItem("paper", b.dataset.paper); } catch {}
+  });
+
+  // Every card at once, to flick the whole set between the judged cuts and the fitted ones
+  const allSeg = document.getElementById("all");
+  allSeg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    for (const x of allSeg.children) x.setAttribute("aria-pressed", String(x === b));
+    for (const item of ITEMS) show(item.id, b.dataset.all === "base" ? BASE : item.fit, true);
+  });
+
+  function restart(root) {
+    for (const ini of root.querySelectorAll(".initial, .big")) {
+      ini.classList.remove("still");
+      for (const svg of ini.querySelectorAll("svg")) svg.replaceWith(svg.cloneNode(true));
+    }
+  }
+  document.getElementById("replay").addEventListener("click", () => restart(bench));
+
+  // Zoom: the same versions, and where a version's outline differs from the judged cut
+  let zItem = null, zT = null;
+  const NS = "http://www.w3.org/2000/svg";
+  const inkPath = svg => (svg.match(/class="initial-ink"[^>]*\sd="([^"]+)"/) || [])[1];
+  const viewBox = svg => (svg.match(/viewBox="([^"]+)"/) || [])[1];
+  function diffSvg(item, t) {
+    const base = ver(item, BASE).svg, other = ver(item, t).svg, n = serial++;
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", viewBox(base));
+    const defs = document.createElementNS(NS, "defs"), clip = document.createElementNS(NS, "clipPath");
+    clip.setAttribute("id", `clip-${n}`);
+    const cp = document.createElementNS(NS, "path"); cp.setAttribute("d", inkPath(base)); clip.append(cp); defs.append(clip);
+    const layer = (d, fill, clipped) => { const p = document.createElementNS(NS, "path"); p.setAttribute("d", d); p.setAttribute("fill", fill); if (clipped) p.setAttribute("clip-path", `url(#clip-${n})`); return p; };
+    svg.append(defs, layer(inkPath(base), "#d8342c"), layer(inkPath(other), "#2f62d8"), layer(inkPath(other), "#111", true));
+    return svg;
+  }
+  function zoomShow(t, still) {
+    zT = t;
+    const v = ver(zItem, t), diff = document.getElementById("zoom-diff").checked;
+    const big = document.getElementById("zoom-big"), paper = document.getElementById("zoom-paper");
+    paper.classList.toggle("diff", diff);
+    document.getElementById("zoom-legend").hidden = !diff;
+    if (diff) { big.replaceChildren(diffSvg(zItem, t)); big.classList.remove("still"); }
+    else { big.innerHTML = svgOf(v.svg); big.classList.toggle("still", !!still); }
+    for (const b of document.querySelectorAll("#zoom-versions button")) b.setAttribute("aria-pressed", String(+b.dataset.t === t));
+    document.getElementById("zoom-meta").textContent = metaText(zItem, v);
+  }
+  function zoom(item) {
+    zItem = item;
+    document.getElementById("zoom-id").textContent = item.id;
+    const seg = versionButtons(item, t => { zoomShow(t, true); show(item.id, t, true); });
+    document.getElementById("zoom-versions").replaceChildren(...seg.children);
+    zoomShow(shown[item.id], false);
+    dlg.showModal();
+  }
+  document.getElementById("zoom-diff").addEventListener("change", () => zoomShow(zT, true));
+  document.getElementById("zoom-close").addEventListener("click", () => dlg.close());
+  document.getElementById("zoom-replay").addEventListener("click", () => restart(dlg));
+  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+
+  build();
+  try { const p = localStorage.getItem("paper"); if (p) paperSeg.querySelector(`[data-paper="${p}"]`)?.click(); } catch {}
+  paint();
+
+  (async () => {
+    db = window.claude ? await claude.use("db") : null;
+    const user = window.claude ? await claude.use("user") : null;
+    canWrite = !!db && (user ? await user.isOwner() : false);
+    if (!db) { status("Choices can't be saved or shown in this view. Every version is here to look at."); paint(); return; }
+    let first = true;
+    const timer = setTimeout(() => status("Saved choices can't be reached yet; what you see may be incomplete.", true), 10000);
+    const done = () => { if (first) { first = false; clearTimeout(timer); status(canWrite ? "Your choices save as you make them. Press a chosen button again to clear it." : "Showing the curator's choices; only the page's owner can change them."); } };
+    db.collection("choices").onSnapshot(snap => {
+      for (const k of Object.keys(choices)) delete choices[k];
+      for (const d of snap.docs) {
+        const x = d.data(), item = ITEMS.find(i => i.id === d.id);
+        if (!item || !x) continue;
+        if (x.verdict === "reject" || (x.verdict === "keep" && ver(item, x.tolerance))) choices[d.id] = { id: d.id, verdict: x.verdict, tolerance: x.tolerance ?? null };
+      }
+      if (!snap.metadata.fromCache) done(); paint();
+    }, e => { clearTimeout(timer); status(`Saved choices can't be read (${e.code}).`, true); });
+    paint();
+  })();
+})();
+</script>

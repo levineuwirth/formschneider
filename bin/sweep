@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Loosen the refit, and see what it saves and what it moves.
+
+Every saved picture of a run is traced once with the trial's fixed
+finishing, then refit at each tolerance given, in units of the 1000-unit
+box (the fixed finishing's is 2). Each refit is measured for cost, its
+path data against the budget, and for how far its outline moves from the
+fixed finishing's, the cut the author judged: deviation both ways at 2 px
+per unit, as the 95th and 99th percentiles and the maximum, in units, and
+the larger of the two directions in CSS px where the page sets the initial
+91 CSS px tall: about 11 units a CSS px in a square box, 8 in W's 1000 x 731.
+A distance says nothing of features: a closed pinhole or a broken white
+gap can matter more than a larger shift along a broad curve, so the
+fitted cuts are judged by eye (bin/compare).
+
+This experiments on the finishing after the pictures were seen; the fixed
+finishing (lib/finish.py) is not changed by it.
+
+Writes out/runs/NAME/sweep/: tT/ID.svg, measures.json, table.md, and
+sheet.png: each kept initial over budget at the fixed finishing and at
+the tightest tolerance that brings it within budget (or the loosest
+tried), at display size on a 2x screen and enlarged.
+
+Usage: sweep NAME [--tolerance T,T,...]  (default: the fit's ladder)
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path as File
+
+import numpy as np
+from scipy.ndimage import distance_transform_edt
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+import run
+from bench import contact, table
+from finish import BUDGET, DISPLAY_PX, FINISH, LADDER, traced
+from initial import initial_svg, measure
+from raster import bare_svg, edge, rasterize
+from simplify import simplify
+
+PER_UNIT = 2      # px per unit when outlines are compared
+DISPLAY = 182     # px tall: the initial's 91 CSS px on a 2x screen
+ENLARGED = 600
+
+
+def raster(path, box, long: int):
+    w, h = box
+    return rasterize(bare_svg(path, box), round(long * w / max(w, h)))
+
+
+def tall(path, box, height: int):
+    """At a height, as the page sets an initial whatever its width."""
+    w, h = box
+    return rasterize(bare_svg(path, box), round(height * w / h))
+
+
+def moved(base, loose) -> dict:
+    """How far the loose outline lies from the base's and the base's from
+    it, in units: p95, p99, max."""
+    ea, eb = edge(base), edge(loose)
+    out = {}
+    for name, d in (("out", distance_transform_edt(~ea)[eb]), ("in", distance_transform_edt(~eb)[ea])):
+        d = d / PER_UNIT
+        out |= {f"{name}95": float(np.percentile(d, 95)), f"{name}99": float(np.percentile(d, 99)),
+                f"{name}max": float(d.max())}
+    return out
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("name")
+    ap.add_argument("--tolerance", default=",".join(f"{t:g}" for t in LADDER))
+    a = ap.parse_args()
+    tols = sorted({float(t) for t in a.tolerance.split(",")} | {float(FINISH["tolerance"])})
+    spec = run.load(a.name)
+    out = ROOT / "out" / "runs" / spec["name"]
+    sweep = out / "sweep"
+    verdicts = {}
+    vfile = ROOT / "runs" / spec["name"] / "verdicts.jsonl"
+    if vfile.exists():
+        for line in vfile.read_text().splitlines():
+            x = json.loads(line)
+            if x["kind"] == "initial":
+                verdicts[x["id"]] = x["verdict"]
+    rows, cuts = [], {}
+    saved = sorted((r for r in run.requests(spec).values() if r["state"] == "saved"),
+                   key=lambda r: r["id"])
+    for n, r in enumerate(saved, 1):
+        raw, box = traced(run.picture(out, r))
+        paths = {t: simplify(raw, t) for t in tols}
+        base = raster(paths[FINISH["tolerance"]], box, 1000 * PER_UNIT)
+        for t in tols:
+            path = paths[t]
+            finish = FINISH | {"tolerance": t}
+            svg = initial_svg(path, box, run.credit(spec, r, finish))
+            (sweep / f"t{t:g}").mkdir(parents=True, exist_ok=True)
+            (sweep / f"t{t:g}" / f"{r['id']}.svg").write_text(svg)
+            m = measure(path, svg)
+            mv = moved(base, raster(path, box, 1000 * PER_UNIT))
+            px = DISPLAY_PX / box[1]  # CSS px per unit, the page setting the initial by height
+            rows.append({"id": r["id"], "route": r["route"], "letter": r["letter"],
+                         "verdict": verdicts.get(r["id"], ""), "tolerance": t, "box": list(box),
+                         "path_bytes": m["path_bytes"], "br_bytes": m["br_bytes"],
+                         "budget": round(m["path_bytes"] / BUDGET, 3), **mv,
+                         "px99": round(max(mv["out99"], mv["in99"]) * px, 2),
+                         "pxmax": round(max(mv["outmax"], mv["inmax"]) * px, 2)})
+            cuts[r["id"], t] = (path, box)
+        print(f"{n}/{len(saved)} {r['id']}", file=sys.stderr)
+    (sweep / "measures.json").write_text(json.dumps(rows, indent=1))
+    (sweep / "table.md").write_text(table(rows, [
+        ("id", "{id}"), ("verdict", "{verdict}"), ("tol", "{tolerance:g}"),
+        ("× budget", "{budget:.2f}"), ("out p95", "{out95:.1f}"), ("out p99", "{out99:.1f}"),
+        ("out max", "{outmax:.1f}"), ("in p99", "{in99:.1f}"), ("in max", "{inmax:.1f}")]))
+    over = [r for r in rows if r["tolerance"] == FINISH["tolerance"] and r["verdict"] == "keep"
+            and r["path_bytes"] > BUDGET]
+    sheet = []
+    for o in over:
+        fits = [x for x in rows if x["id"] == o["id"] and x["path_bytes"] <= BUDGET]
+        t = min(x["tolerance"] for x in fits) if fits else tols[-1]
+        b = next(x["budget"] for x in rows if x["id"] == o["id"] and x["tolerance"] == t)
+        cells = []
+        for tt, bb in ((FINISH["tolerance"], o["budget"]), (t, b)):
+            cells.append((f"t{tt:g} ×{bb:.2f}", tall(*cuts[o["id"], tt], DISPLAY)))
+        for tt in (FINISH["tolerance"], t):
+            cells.append((f"t{tt:g}", raster(*cuts[o["id"], tt], ENLARGED)))
+        sheet.append((o["id"], cells))
+    if sheet:
+        contact(sheet, cell=ENLARGED).save(sweep / "sheet.png")
+    for route in sorted({r["route"] for r in rows}):
+        for t in tols:
+            mine = [r for r in rows if r["route"] == route and r["tolerance"] == t]
+            kept = [r for r in mine if r["verdict"] == "keep"]
+            print(f"{route:8} t{t:<3g} kept within 1.0: {sum(r['path_bytes'] <= BUDGET for r in kept):2}/{len(kept)}"
+                  f"  1.1: {sum(r['budget'] <= 1.1 for r in kept):2}/{len(kept)}"
+                  f"  median ×{np.median([r['budget'] for r in mine]):.2f}"
+                  f"  p99 either way ≤{max(r['px99'] for r in mine):.2f} CSS px"
+                  f"  max ≤{max(r['pxmax'] for r in mine):.2f} CSS px")
+
+
+if __name__ == "__main__":
+    main()

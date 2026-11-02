@@ -19,43 +19,7 @@ from pathlib import Path as File
 ROOT = File(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lib"))
 import run
-
-# Opening paragraphs from the site's essays, one per letter, so an initial
-# is judged where it would stand.
-TEXT = {
-    "A": ("essays/branch-based-local-capture-in-tree-balls",
-          "An induced tree-ball does not control shortest paths between arbitrary pairs of its "
-          "vertices: a competing path may leave the ball and re-enter. The required radius depends "
-          "on the endpoint depths and on the length of their path inside the tree-ball."),
-    "F": ("essays/ball-occupation-under-coarse-projections",
-          "For degree zero or one, use a singleton cloud, serving as the external port in the "
-          "degree-one case. Each round replaces every vertex according to its current degree, "
-          "including vertices of degree two or three. For degree reduction, stop when the entire "
-          "graph is subcubic."),
-    "I": ("essays/asymmetric-forgetting",
-          "I have deliberately chosen not to describe what a concept-first curriculum would look "
-          "like. This is a separate piece of work that is owed its own diligent treatment, and I "
-          "refuse to attempt to distill and collapse it into the closing of this one."),
-    "O": ("essays/crawler_chronicles",
-          "Only aggregate results and sanitized publication records are public. Raw access logs, "
-          "addresses, individual user-agent strings and request sequences remained on the VPS. A "
-          "user-agent cohort is a traffic classification, not a verified person or organization."),
-    "S": ("essays/verified-inference",
-          "Streaming solves a memory problem by creating a regeneration problem. The model and its "
-          "auxiliaries are revisited across proof stages. At small context lengths, loading and "
-          "converting the weights can dominate even when little token computation is required."),
-    "W": ("essays/asymmetric-forgetting",
-          "Where do I land amidst all of this, and why do I care? I offer my own retention audit of "
-          "sorts not as proof of the mechanism, but as a demonstration that it is at least "
-          "observable in lived form."),
-}
-
-ROUTES = [
-    {"key": "whole", "title": "Whole initials", "short": "whole initials",
-     "note": "Letter and ornament both drawn by the model."},
-    {"key": "ornament", "title": "Ornament only", "short": "ornament-only initials",
-     "note": "Spectral SemiBold's capital kept; the model drew the rest."},
-]
+from specimens import ROUTES, TEXT, page as fill
 
 
 def main() -> None:
@@ -85,9 +49,8 @@ def main() -> None:
     data = {"routes": [r for r in ROUTES if r["key"] in spec["routes"]], "letters": letters,
             "items": items, "text": {c: TEXT[c][1] for c in letters},
             "sources": {c: TEXT[c][0] for c in letters}}
-    page = (ROOT / "lib" / "curate.html").read_text()
-    page = (page.replace("__TITLE__", html.escape(title)).replace("__LEDE__", html.escape(lede))
-            .replace("__DATA__", json.dumps(data).replace("</", "<\\/")))
+    page = fill("curate.html", TITLE=html.escape(title), LEDE=html.escape(lede),
+                DATA=json.dumps(data).replace("</", "<\\/"))
     (out / "curate.html").write_text(page)
     print(f"{out / 'curate.html'}: {len(items)} initials, {len(page) / 1e6:.1f} MB")
 
