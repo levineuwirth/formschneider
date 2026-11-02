@@ -98,7 +98,10 @@ first, so `--limit` samples every route and letter. Both files are in git.
 The pictures, and every input under its checksum, go to `out/runs/NAME/`.
 Finishing reads only the record and the files it names, checked, so
 editing the spec after a run cannot change what the run's pictures are
-finished with.
+finished with. `bin/archive` packs a run's pictures and kept inputs with
+its record into one archive, built the same way every time, and writes
+its checksum to `runs/NAME/archives.json`, so any copy kept elsewhere can
+be checked against git.
 
 - **Ornament only:** Spectral SemiBold's capital is set in its block on a
   canvas of the provider's size, and the model may draw everywhere but the
@@ -113,6 +116,7 @@ finished with.
 bin/generate pilot-openai        # plan only: what would be sent, and its inputs in out/
 bin/generate pilot-openai --go --limit 4   # send four (keys from .env); stops at an error
 bin/finish pilot-openai          # put back, cut, measure: out/runs/pilot-openai/finished/
+bin/archive pilot-openai         # pictures, inputs and record in one checked archive
 ```
 
 ## Running

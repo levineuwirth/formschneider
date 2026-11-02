@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Pack what a run made with what was sent into one archive, and put its
+checksum into git.
+
+Every file is first checked against the record: each saved picture
+against its checksum, each kept input against the checksum that names it.
+The archive (out/archives/NAME-DATE.tar) holds records.jsonl, spec.toml,
+images/, inputs/sha256/ and manifest.json, every file's checksum. It is
+built the same way every time (sorted, no owners, no times), so the same
+run packs to the same bytes. runs/NAME/archives.json, in git, records
+each archive's name, size and checksum, and where copies are kept, which
+the author adds.
+
+Usage: archive NAME
+"""
+
+import datetime
+import hashlib
+import io
+import json
+import sys
+import tarfile
+from pathlib import Path as File
+
+ROOT = File(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+import run
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def main() -> None:
+    spec = run.load(sys.argv[1])
+    src, out = ROOT / "runs" / spec["name"], ROOT / "out" / "runs" / spec["name"]
+    files = {"records.jsonl": (src / "records.jsonl").read_bytes(),
+             "spec.toml": (src / "spec.toml").read_bytes()}
+    for r in run.requests(spec).values():
+        if r["state"] != "saved":
+            continue
+        data = (out / r["output"]["file"]).read_bytes()
+        if sha(data) != r["output"]["sha256"]:
+            sys.exit(f"{r['id']}: the picture is not the one recorded; nothing packed")
+        files[r["output"]["file"]] = data
+        i = r["inputs"]
+        for digest in [*i["refs"].values(), i.get("canvas"), i.get("editable")]:
+            if digest:
+                data = (out / "inputs" / "sha256" / f"{digest}.png").read_bytes()
+                if sha(data) != digest:
+                    sys.exit(f"input {digest[:12]}… is not the one sent; nothing packed")
+                files[f"inputs/sha256/{digest}.png"] = data
+    files["manifest.json"] = json.dumps({n: sha(d) for n, d in sorted(files.items())},
+                                        indent=1).encode()
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w", format=tarfile.PAX_FORMAT) as tar:
+        for name, data in sorted(files.items()):
+            info = tarfile.TarInfo(f"{spec['name']}/{name}")
+            info.size, info.mode, info.mtime = len(data), 0o644, 0
+            tar.addfile(info, io.BytesIO(data))
+    data = buf.getvalue()
+    name = f"{spec['name']}-{datetime.date.today().isoformat()}.tar"
+    (ROOT / "out" / "archives").mkdir(parents=True, exist_ok=True)
+    (ROOT / "out" / "archives" / name).write_bytes(data)
+    log = src / "archives.json"
+    entries = json.loads(log.read_text()) if log.exists() else []
+    entries = [e for e in entries if e["name"] != name] + [
+        {"name": name, "bytes": len(data), "sha256": sha(data), "files": len(files),
+         "copies": []}]
+    log.write_text(json.dumps(entries, indent=1) + "\n")
+    print(f"{name}: {len(files)} files, {len(data) / 1e6:.1f} MB, sha256 {sha(data)}")
+
+
+if __name__ == "__main__":
+    main()
