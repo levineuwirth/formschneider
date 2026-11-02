@@ -11,10 +11,13 @@ events, each naming its request:
   returned  as soon as the provider answers, before the picture is touched:
             request id, usage, time taken, the returned bytes' checksum
   saved     the picture written to out/ and read back
-  failed    the request or what followed it failed: allowlisted fields only
+  failed    the provider answered with an error (an HTTP status), or what
+            followed a returned picture failed: allowlisted fields only
             (model.error_fields), never the message
-  abandoned the author's decision about a request that was sent and never
-            heard of again (bin/generate --abandon)
+  unknown   the request failed with no answer from the provider (a timeout,
+            a lost connection): whether it was done, and billed, is unknown
+  abandoned the author's decision about a request whose outcome is unknown,
+            sent and never heard of or ended in a timeout (--abandon)
 
 So every request is on record before it costs anything, and a run that
 stops anywhere can be resumed without silently repeating one. Nothing in
@@ -163,15 +166,18 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
             log=print) -> list[Job]:
     """Make the run's outstanding requests, or, without go, only say what
     they would be and write their inputs out for looking at."""
+    if limit is not None and limit < 0:
+        raise SystemExit(f"--limit must be 0 or more, not {limit}")
     out = out or root / "out" / "runs" / spec["name"]
     _reconcile(spec, root, out)
     reqs = requests(spec, root)
-    lost = {k: r for k, r in reqs.items() if r["state"] == "sent"}
+    lost = {k: r for k, r in reqs.items() if r["state"] in ("sent", "unknown")}
     if lost and not abandon:
-        raise SystemExit(f"{len(lost)} request(s) were sent and never heard of again: "
+        raise SystemExit(f"{len(lost)} request(s) were sent and their outcome is unknown "
+                         "(never heard of again, a timeout, or a lost connection): "
                          + ", ".join(r["id"] for r in lost.values())
-                         + ". They may have been billed. Check the provider's usage, then "
-                         "run again with --abandon to record that and plan them again.")
+                         + ". They may have been done and billed. Check the provider's usage, "
+                         "then run again with --abandon to record that and plan them again.")
     if lost and go:
         for k in lost:
             _log(spec, root, "abandoned", k)
@@ -217,7 +223,10 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
         try:
             res = callers[j.provider, j.model](req)
         except Exception as e:  # recorded, and the run stops: the next would likely fail too
-            _log(spec, root, "failed", key, error=error_fields(e))
+            # an HTTP status means the provider answered; anything else (a
+            # timeout, a lost connection) leaves the outcome unknown
+            fields = error_fields(e)
+            _log(spec, root, "failed" if "status" in fields else "unknown", key, error=fields)
             raise
         _log(spec, root, "returned", key, request_id=res.request_id, seconds=res.seconds,
              usage=res.usage, meta=res.meta, bytes=len(res.png), sha256=_sha(res.png))

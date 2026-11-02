@@ -84,13 +84,16 @@ log of each request's events:
 - **returned:** the request id, usage, and the checksum of what came
   back, written before the picture is touched;
 - **saved:** the picture written and read back;
-- **failed:** the error's class, status, request id and provider code,
-  but never its message, which can name an account.
+- **failed:** the provider answered with an error: its class, status,
+  request id and provider code, but never its message, which can name an
+  account;
+- **unknown:** no answer at all (a timeout, a lost connection), so
+  whether the request was done, and billed, is unknown.
 
 The client never retries on its own, so every request is on record before
 it can cost anything, and none is repeated silently. A request that was
-sent and never heard of again stops the run until the author has checked
-the provider's usage and passes `--abandon`. Requests go out breadth
+sent and never heard of again, or whose outcome is unknown, stops the run
+until the author has checked the provider's usage and passes `--abandon`. Requests go out breadth
 first, so `--limit` samples every route and letter. Both files are in git.
 The pictures, and every input under its checksum, go to `out/runs/NAME/`.
 Finishing reads only the record and the files it names, checked, so

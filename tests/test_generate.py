@@ -198,18 +198,52 @@ def test_finishing_uses_the_inputs_sent_not_the_spec_as_it_is_now(spec):
         run.finish(spec, root)
 
 
-def test_a_failed_request_is_recorded_and_stops_the_run(spec):
-    spec, root = spec
+class HTTPError(Exception):
+    status_code = 400
 
-    def broken(model, **params):
-        def fail(req):
-            raise RuntimeError("org-Secret42 said no")
-        return fail
-    with pytest.raises(RuntimeError):
-        run.execute(spec, {"fake": broken}, go=True, root=root, log=quiet)
+
+def raising(e):
+    def adapter(model, **params):
+        def call(req):
+            raise e
+        return call
+    return adapter
+
+
+def test_an_answered_error_is_recorded_stops_the_run_and_is_planned_again(spec):
+    spec, root = spec
+    with pytest.raises(HTTPError):
+        run.execute(spec, {"fake": raising(HTTPError("org-Secret42 said no"))}, go=True,
+                    root=root, log=quiet)
     (rec,) = run.requests(spec, root).values()
-    assert rec["state"] == "failed" and rec["error"] == {"class": "RuntimeError"}
+    assert rec["state"] == "failed" and rec["error"] == {"class": "HTTPError", "status": 400}
     assert "Secret42" not in (root / "runs/t/records.jsonl").read_text()
+    spec["max_requests"] = 9
+    run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    assert len(saved(spec, root)) == 8
+
+
+def test_a_timeout_leaves_the_outcome_unknown_until_abandoned(spec):
+    spec, root = spec
+    spec["max_requests"] = 9
+    with pytest.raises(TimeoutError):
+        run.execute(spec, {"fake": raising(TimeoutError("read timed out"))}, go=True,
+                    root=root, log=quiet)
+    (rec,) = run.requests(spec, root).values()
+    assert rec["state"] == "unknown" and rec["error"] == {"class": "TimeoutError"}
+    with pytest.raises(SystemExit, match="outcome is unknown"):
+        run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    assert [e["event"] for e in run.events(spec, root)] == ["sent", "unknown"]
+    run.execute(spec, {"fake": fake_adapter}, go=True, abandon=True, root=root, log=quiet)
+    states = [r["state"] for r in run.requests(spec, root).values()]
+    assert states.count("abandoned") == 1 and states.count("saved") == 8
+
+
+def test_a_negative_limit_is_refused_before_anything_is_done(spec):
+    spec, root = spec
+    with pytest.raises(SystemExit, match="--limit"):
+        run.execute(spec, {"fake": fake_adapter}, go=True, limit=-1, root=root, log=quiet)
+    assert run.events(spec, root) == [] and not (root / "out").exists()
 
 
 def test_a_picture_that_cannot_be_read_is_still_accounted_for(spec):

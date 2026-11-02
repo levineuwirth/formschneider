@@ -9,7 +9,8 @@ first. With --go it reads the keys from .env and sends them, breadth
 first (every route and letter before a second attempt), recording each
 before it goes out and stopping at the first error. A request that was
 sent and never heard of again stops the run until the author has checked
-the provider's usage and passes --abandon, which records that decision.
+the provider's usage and passes --abandon, which records that decision;
+so does one that ended in a timeout or a lost connection.
 
 Usage: uv run --extra openai bin/generate NAME [--go] [--limit N] [--abandon]
 """
@@ -36,9 +37,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("name")
     ap.add_argument("--go", action="store_true", help="send the requests; without it, only plan")
-    ap.add_argument("--limit", type=int)
+    ap.add_argument("--limit", type=int, help="at most this many requests (0 or more)")
     ap.add_argument("--abandon", action="store_true",
-                    help="record requests sent and never heard of as abandoned, and plan them again")
+                    help="record requests whose outcome is unknown as abandoned, and plan them again")
     a = ap.parse_args()
     if a.go:
         print("keys from .env:", ", ".join(env.load(ROOT / ".env")) or "none")
