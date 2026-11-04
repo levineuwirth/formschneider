@@ -145,6 +145,17 @@ levineuwirth.org's repository. A test that skips there fails the run.
 
 ## License
 
-The code is MIT (`LICENSE`). Fonts are not copied into the repository.
-A generated initial carries its own terms, recorded with it, which
-depend on the model that drew it.
+Copyright (C) 2026 Levi Neuwirth.
+
+The code is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version (`LICENSE`). It is distributed in the hope
+that it will be useful, but WITHOUT ANY WARRANTY; without even the
+implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Commits through `04cbda3` were released under the MIT License, and
+copies taken from them stay under it.
+
+Fonts are not copied into the repository. A generated initial carries
+its own terms, recorded with it, which depend on the model that drew it.
