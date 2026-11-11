@@ -215,7 +215,8 @@ def test_a_spec_is_checked_against_its_endpoint():
             check(wrong, 6)
 
 
-@pytest.mark.parametrize("name,count", [("matched-rinceau", 288), ("pilot-ornament-prompt", 12)])
+@pytest.mark.parametrize("name,count", [("matched-rinceau", 288), ("pilot-ornament-prompt", 12),
+                                        ("pilot-fal", 10)])
 def test_the_runs_prepared_fit_their_endpoints_and_their_ceilings(name, count):
     spec = run.load(name)
     for m in spec["model"]:

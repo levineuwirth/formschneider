@@ -138,6 +138,18 @@ bin/archive pilot-openai         # pictures, inputs and record in one checked ar
 bin/curate pilot-openai          # a curation page to publish: keep or reject each, judge each set
 ```
 
+Finishing also reports, for each ornament-only initial, how the model's own
+picture of the letter sat on the kept one before it was put back:
+`letter_iou` over the letter and its halo, `band` (the share of a thin
+ring outside the halo the model inked, which shows as a dark band once the
+kept letter is put back), `drift` (how far the model moved the letter, in
+units) and `stretch` (for a model that chose its own size). In the OpenAI
+pilot, with a mask, the model kept the A where it was and redrew the O
+smaller and off center. A model's cost is recorded with each request: by
+its usage at `usd_per_mtok` (OpenAI) or by the billable units fal reports
+at `usd_per_unit`. `runs/pilot-fal` tries each fal model once per route
+before the matched run.
+
 `runs/smoke-openai` is the first picture: one request of 2026-10-30, made
 before the runner existed, its record written afterwards from the note kept
 with it.

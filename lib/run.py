@@ -44,7 +44,7 @@ import numpy as np
 from PIL import Image
 
 from bench import contact
-from canvas import Layout, halo_view, letter_canvas, png, put_back, references
+from canvas import Layout, halo_view, letter_canvas, png, put_back, references, registration
 from finish import BUDGET, FINISH, crop_to_ink, fitted, measures, traced
 from fonts import EBGI, SPECTRAL
 from initial import initial_svg, measure
@@ -163,10 +163,16 @@ _TOKENS = {"text_input": ("input_tokens_details", "text_tokens"),
            "image_output": ("output_tokens_details", "image_tokens")}
 
 
-def usd(usage: dict | None, rates: dict | None) -> float | None:
-    """What a request cost by its usage at the rates the spec records (USD
-    per million tokens), or None when either is missing or a kind of token
-    used has no rate."""
+def usd(usage: dict | None, rates: dict | None, per_unit: float | None = None) -> float | None:
+    """What a request cost by its usage at the prices the spec records: USD
+    per million tokens (`rates`, OpenAI's usage), or USD per billable unit
+    (`per_unit`, the units fal reports for a request). None when the usage
+    or the price is missing, or a kind of token used has no rate."""
+    if usage and per_unit is not None and usage.get("billable_units") is not None:
+        try:
+            return round(float(usage["billable_units"]) * per_unit, 6)
+        except (TypeError, ValueError):
+            return None
     if not usage or not rates:
         return None
     total = 0.0
@@ -283,6 +289,7 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
         _log(spec, root, "sent", key, id=j.id, **asdict(j), run=spec["name"], prompt=req.prompt,
              size=list(req.size), params=m.get("params", {}), inputs=inputs,
              terms=m.get("terms"), est_usd=m.get("est_usd"), usd_per_mtok=m.get("usd_per_mtok"),
+             usd_per_unit=m.get("usd_per_unit"),
              seed=req.seed, code=code,
              **({"crop": crop} if crop and j.route == "whole" else {}))
         try:
@@ -295,7 +302,8 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
             _log(spec, root, "failed" if known else "unknown", key, error=fields)
             raise
         _log(spec, root, "returned", key, request_id=res.request_id, seconds=res.seconds,
-             usage=res.usage, usd=usd(res.usage, m.get("usd_per_mtok")), meta=res.meta,
+             usage=res.usage, usd=usd(res.usage, m.get("usd_per_mtok"), m.get("usd_per_unit")),
+             meta=res.meta,
              bytes=len(res.png), sha256=_sha(res.png))
         try:  # the bytes as they came, named for what they are: not every model can send a PNG
             pic = Image.open(io.BytesIO(res.png))
@@ -329,6 +337,20 @@ def picture(out: File, r: dict) -> Image.Image:
         gray = put_back(gray, canvas, editable, Layout(tuple(r["size"]), tuple(i["block"]),
                                                        tuple(i["box"])))
     return gray
+
+
+def letter_registration(out: File, r: dict) -> dict:
+    """For an ornament-only initial, how the model's own picture of the
+    letter sat on the kept one (canvas.registration), from the picture and
+    the canvas kept when it was sent, both checked. Empty for a whole one."""
+    if r["route"] != "ornament":
+        return {}
+    data = (out / r["output"]["file"]).read_bytes()
+    if _sha(data) != r["output"]["sha256"]:
+        raise SystemExit(f"{r['id']}: the picture is not the one the record says was made")
+    i = r["inputs"]
+    return registration(Image.open(io.BytesIO(data)), _kept(out, i["canvas"]).convert("L"),
+                        Layout(tuple(r["size"]), tuple(i["block"]), tuple(i["box"])), i["grow"])
 
 
 def letter_outline(out: File, r: dict, box: tuple[int, int]) -> Path | None:
@@ -383,7 +405,7 @@ def finish(spec: dict, root: File = ROOT, out: File | None = None) -> list[dict]
                "attempt": r["attempt"], **measures(gray, path, box, svg), "box": list(box),
                "outline_bytes": len(fmt(letter)) if letter else 0,
                "fit_tolerance": t, "fit_path_bytes": fit_bytes,
-               "fit_budget": round(fit_bytes / BUDGET, 3)}
+               "fit_budget": round(fit_bytes / BUDGET, 3), **letter_registration(out, r)}
         rows.append(row)
         cells.setdefault(r["letter"], []).append(
             (f"{r['route'][0]}{r['attempt']} {row['path_bytes'] / 1000:.0f} KB ×{row['budget']:.1f}",

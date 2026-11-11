@@ -1,0 +1,115 @@
+# The fal pilot: one whole and one ornament-only W from each fal model, before
+# the matched run sends 240 requests to them. What it is to settle:
+#
+# - Ideogram's mask: no page says whether white or black marks where it may
+#   draw; the adapter sends white, from an experiment on fal's example.
+# - What a fal request costs: each record prices fal's billable units at
+#   usd_per_unit, which is read from pages that disagree; compare the
+#   records' usd with fal's billing for these ten.
+# - What the four models with no mask do with the kept letter: finishing
+#   reports each ornament initial's registration (letter_iou, band, drift,
+#   stretch), as it now does for every run.
+# - The sizes the models answer at, for 3:2 asked as an aspect ratio.
+#
+# W, for its wide canvas. Settings and prompts are the matched run's; the
+# models' entries are copied from it, prices included. Nothing has been sent.
+
+letters = "W"
+attempts = 1
+routes = ["whole", "ornament"]
+idiom = "rinceau"
+max_requests = 12           # 10 planned, and room for two that fail
+
+[letter]                    # the kept capital, for the ornament-only route
+weight = "SemiBold"
+cap = 0.82
+grow = 10
+fill = true                 # a wide letter's block widened to its canvas, so no ornament is cropped off
+
+[finish]
+crop = "ink"                # a whole initial cut to its ink, as the ornament route is to its block
+
+[refs]                      # as in the pilot: none of the trial's six letters
+letters = "DGLNQT"
+
+[[model]]
+provider = "fal"
+model = "google/nano-banana-2.1/edit"   # released 2026-10-06; Gemini; no mask
+name = "nanobanana21"
+sizes = [[1024, 1024], [1536, 1024]]    # sent as 1:1 and 3:2 at 1K, about 1 MP
+seeded = true
+params = { resolution = "1K", output_format = "png" }
+# billed by tokens: $0.044 for a 1K edit with two inputs, by fal's page; a
+# guess for seven. The billing record is the truth.
+est_usd = 0.06
+usd_per_unit = 1.0          # fal's pricing page: "$1 per units", so a unit is a dollar; its page also
+                            # gives token rates. Unconfirmed: pilot-fal checks it against fal's billing
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[[model]]
+provider = "fal"
+model = "blackforestlabs/flux-3/edit-image"   # no mask; takes no seed
+name = "flux3"
+sizes = [[1024, 1024], [1536, 1024]]    # sent as 1:1 and 3:2 at 1k, about 1 MP
+params = { resolution = "1k", output_format = "png", enable_prompt_expansion = false }
+est_usd = 0.048             # flat at 1 MP, whatever the number of references
+usd_per_unit = 0.048        # fal's pricing page: per megapixel. Unconfirmed until pilot-fal
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[[model]]
+provider = "fal"
+model = "bytedance/seedream/v5/pro/edit"   # no mask; takes no seed
+name = "seedream5"
+sizes = [[1024, 1024], [1536, 1024]]
+# its prompt optimization has no off setting; "standard" is the default
+params = { output_format = "png", watermark = false, num_images = 1 }
+est_usd = 0.095             # $0.0675 up to 1536 x 1536 + $0.0045 per input after the first ("tentative")
+usd_per_unit = 0.0675       # fal's pricing page: per unit. Unconfirmed until pilot-fal
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[[model]]
+provider = "fal"
+model = "alibaba/qwen-image-3/edit"     # no mask
+name = "qwen3"
+sizes = [[1024, 1024], [1536, 1024]]
+max_images = 3              # the endpoint's limit: D, G, L; or the canvas with D and G
+seeded = true
+params = { enable_prompt_expansion = false, output_format = "png", num_images = 1 }
+est_usd = 0.075             # fal's pages disagree: $0.04 at 1K or $0.075
+usd_per_unit = 0.04         # not on fal's pricing page; its own page: $0.04 an image at 1K,
+                            # so a unit taken for an image. Unconfirmed until pilot-fal
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[[model]]
+provider = "fal"
+model = "fal-ai/ideogram/v3"            # with a canvas, fal-ai/ideogram/v3/edit and a mask
+name = "ideogram3"
+sizes = [[1024, 1024], [1536, 1024]]
+seeded = true
+params = { rendering_speed = "QUALITY", enable_prompt_expansion = false, num_images = 1 }
+est_usd = 0.09
+usd_per_unit = 0.09         # not on fal's pricing page; its own page: $0.09 an image at QUALITY,
+                            # so a unit taken for an image. Unconfirmed until pilot-fal
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[prompt]
+# The pilot's words. The ornament prompt may change with what
+# pilot-ornament-prompt shows, before anything here is sent.
+whole = """\
+A woodcut ornamental initial as printed in France in the sixteenth century: \
+the capital letter {letter}, large and centered in a block that fills the \
+picture, among vine scrolls (rinceau) of curling stems, leaves and small \
+flowers, cut as solid black shapes on an open white ground. Black ink on \
+white only: the ground is white, never black. No frame or border. No other \
+letters or words anywhere. Crisp, flat black edges: no paper texture, no \
+shading, no hatching, no gray. The reference images show the style to \
+follow; take their ornament, not their letters."""
+ornament = """\
+The first image is a woodcut ornamental initial in which only the capital \
+letter {letter} has been cut. Fill the empty white space around the letter \
+with vine scrolls (rinceau) of curling stems, leaves and small flowers, cut \
+as solid black shapes on an open white ground and filling the picture \
+evenly, in the style of the other images. Leave the letter exactly as it is, \
+with a thin white gap around it. Draw no letters, words or frame. Black ink \
+on white only, crisp flat edges: no paper texture, no shading, no hatching, \
+no gray."""

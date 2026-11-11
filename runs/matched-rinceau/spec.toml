@@ -4,7 +4,8 @@
 # are not here: Recraft V4 and Ideogram 4 take text alone on fal, and FLUX.1
 # Fill takes no references; open models come in a run of their own.
 #
-# The endpoints and prices were read from fal's pages on 2026-11-03. Only
+# The endpoints and prices were read from fal's pages on 2026-11-03, and
+# checked against their schemas on 2026-11-11. Only
 # OpenAI's model is a dated snapshot; fal's have no snapshots to pin, so the
 # date in each record is all that says which version answered, and the
 # models should be run in one sitting. Nothing has been sent.
@@ -48,6 +49,8 @@ params = { resolution = "1K", output_format = "png" }
 # billed by tokens: $0.044 for a 1K edit with two inputs, by fal's page; a
 # guess for seven. The billing record is the truth.
 est_usd = 0.06
+usd_per_unit = 1.0          # fal's pricing page: "$1 per units", so a unit is a dollar; its page also
+                            # gives token rates. Unconfirmed: pilot-fal checks it against fal's billing
 terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
 
 [[model]]
@@ -57,6 +60,7 @@ name = "flux3"
 sizes = [[1024, 1024], [1536, 1024]]    # sent as 1:1 and 3:2 at 1k, about 1 MP
 params = { resolution = "1k", output_format = "png", enable_prompt_expansion = false }
 est_usd = 0.048             # flat at 1 MP, whatever the number of references
+usd_per_unit = 0.048        # fal's pricing page: per megapixel. Unconfirmed until pilot-fal
 terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
 
 [[model]]
@@ -67,6 +71,7 @@ sizes = [[1024, 1024], [1536, 1024]]
 # its prompt optimization has no off setting; "standard" is the default
 params = { output_format = "png", watermark = false, num_images = 1 }
 est_usd = 0.095             # $0.0675 up to 1536 x 1536 + $0.0045 per input after the first ("tentative")
+usd_per_unit = 0.0675       # fal's pricing page: per unit. Unconfirmed until pilot-fal
 terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
 
 [[model]]
@@ -78,6 +83,8 @@ max_images = 3              # the endpoint's limit: D, G, L; or the canvas with 
 seeded = true
 params = { enable_prompt_expansion = false, output_format = "png", num_images = 1 }
 est_usd = 0.075             # fal's pages disagree: $0.04 at 1K or $0.075
+usd_per_unit = 0.04         # not on fal's pricing page; its own page: $0.04 an image at 1K,
+                            # so a unit taken for an image. Unconfirmed until pilot-fal
 terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
 
 [[model]]
@@ -88,6 +95,8 @@ sizes = [[1024, 1024], [1536, 1024]]
 seeded = true
 params = { rendering_speed = "QUALITY", enable_prompt_expansion = false, num_images = 1 }
 est_usd = 0.09
+usd_per_unit = 0.09         # not on fal's pricing page; its own page: $0.09 an image at QUALITY,
+                            # so a unit taken for an image. Unconfirmed until pilot-fal
 terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
 
 [prompt]

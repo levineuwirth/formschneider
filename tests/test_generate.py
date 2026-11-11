@@ -407,3 +407,40 @@ def test_the_credit_reads_as_words():
          "at": {"sent": "2026-11-11T00:00:00+00:00"}, "terms": "T."}
     c = run.credit({"name": "t"}, r)
     assert "Cut: width 2048, median 3, speck 20, tolerance 2." in c and "{" not in c
+
+
+def test_registration_reads_where_the_model_drew_the_letter():
+    from canvas import registration
+    from scipy.ndimage import binary_dilation
+    path, box = capital(SPECTRAL.format(weight="SemiBold"), "F")
+    canvas, editable, lay = letter_canvas(path, box, (512, 512), grow=10)
+    same = registration(canvas, canvas, lay, 10)
+    assert same["letter_iou"] == 1 and same["band"] == 0 and same["drift"] == 0 and same["stretch"] == 0
+    moved = Image.new("L", canvas.size, 255)
+    moved.paste(canvas.crop((0, 0, 492, 512)), (20, 0))          # 20 px right: about 39 units
+    m = registration(moved, canvas, lay, 10)
+    assert m["drift_xy"][0] == pytest.approx(20 * 1000 / 512, abs=3) and abs(m["drift_xy"][1]) < 3
+    assert m["letter_iou"] < 0.9 and m["band"] > 0.05
+    heavy = Image.fromarray(np.where(binary_dilation(np.asarray(canvas) < 128, iterations=12), 0, 255)
+                            .astype(np.uint8))
+    h = registration(heavy, canvas, lay, 10)
+    assert h["band"] > 0.5 and h["drift"] < 3                       # heavier, not moved
+    wide = registration(canvas.resize((768, 512)), canvas, lay, 10)
+    assert wide["stretch"] == pytest.approx(0.405, abs=0.01)
+
+
+def test_a_fal_request_is_priced_by_its_billable_units():
+    assert run.usd({"billable_units": "1.5"}, None, 0.048) == pytest.approx(0.072)
+    assert run.usd({"billable_units": None}, None, 0.048) is None
+    assert run.usd({"inference_time": 3.5}, None, 0.048) is None
+    assert run.usd({"billable_units": "n/a"}, None, 0.048) is None
+
+
+def test_finishing_reports_the_registration_of_an_ornament_initial(spec):
+    spec, root = spec
+    spec["letters"], spec["attempts"] = "F", 1
+    run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    rows = {r["route"]: r for r in run.finish(spec, root)}
+    assert {"letter_iou", "band", "drift", "stretch"} <= set(rows["ornament"])
+    assert "letter_iou" not in rows["whole"]
+    json.dumps(rows["ornament"])

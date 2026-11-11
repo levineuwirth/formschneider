@@ -9,6 +9,7 @@ there. Style references are EB Garamond Initials' letters, rendered here.
 """
 
 import io
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -61,6 +62,53 @@ def halo_view(canvas: Image.Image, editable: np.ndarray) -> Image.Image:
     rgb = np.stack([np.asarray(canvas.convert("L"))] * 3, -1)
     rgb[~editable & (np.asarray(canvas.convert("L")) >= 128)] = (220, 60, 60)
     return Image.fromarray(rgb, "RGB")
+
+
+def registration(output: Image.Image, canvas: Image.Image, lay: Layout, grow: float,
+                 ring: float = 12, reach: float = 60) -> dict:
+    """How the model's own picture of the letter sits on the kept one, read
+    before the letter is put back, all on the canvas and in units:
+
+    letter_iou  agreement of the model's ink with the letter over the letter
+                and its halo, the region put back (1: drawn where it was)
+    band        the share of a ring `ring` units wide just outside the halo
+                that the model inked: a letter redrawn heavier or moved
+                leaves this as a dark band once the kept letter is put back
+    drift       how far the model's ink best matches the letter shifted, at
+                most `reach` units: a letter the model moved
+    stretch     how far the picture's shape is from the canvas's, as a share,
+                for a model that chose its own size"""
+    from prepare import otsu
+    out = output.convert("L")
+    stretch = abs(math.log(out.width / out.height * canvas.height / canvas.width))
+    if out.size != canvas.size:
+        out = out.resize(canvas.size, Image.Resampling.LANCZOS)
+    drawn = np.asarray(out) <= round(otsu(out) * 255)
+    letter = ink(canvas)
+    x0, y0, x1, y1 = lay.block
+    ppu = (x1 - x0) / lay.box[0]
+    inside = np.zeros_like(letter)
+    inside[y0:y1, x0:x1] = True
+    dist = distance_transform_edt(~letter)
+    halo = grow * ppu
+    zone = letter | (dist <= halo)
+    rim = inside & (dist > halo) & (dist <= halo + ring * ppu)
+    near = inside & (dist <= reach * ppu)
+    # the shift at which the model's ink near the letter best covers it
+    k = max(1, round(max(canvas.size) / 256))
+    a, b = (near & drawn)[::k, ::k].astype(float), letter[::k, ::k].astype(float)
+    corr = np.fft.irfft2(np.fft.rfft2(a) * np.conj(np.fft.rfft2(b)), a.shape)
+    lim = int(reach * ppu / k)
+    dy, dx = np.meshgrid(np.arange(a.shape[0]), np.arange(a.shape[1]), indexing="ij")
+    dy, dx = np.where(dy > a.shape[0] // 2, dy - a.shape[0], dy), np.where(dx > a.shape[1] // 2, dx - a.shape[1], dx)
+    corr[(abs(dy) > lim) | (abs(dx) > lim)] = -1
+    i = np.unravel_index(np.argmax(corr), corr.shape)
+    sx, sy = float(dx[i] * k / ppu), float(dy[i] * k / ppu)   # right and down are positive
+    union = (drawn & zone | letter).sum()
+    return {"letter_iou": round(float((drawn & letter).sum() / union), 4) if union else None,
+            "band": round(float(drawn[rim].mean()), 4) if rim.any() else None,
+            "drift": round(math.hypot(sx, sy), 1), "drift_xy": [round(sx, 1), round(sy, 1)],
+            "stretch": round(stretch, 4)}
 
 
 def put_back(output: Image.Image, canvas: Image.Image, editable: np.ndarray,
