@@ -25,6 +25,8 @@ name = "sunburst"
 sizes = [[1024, 1024], [1536, 1024]]
 params = { quality = "high" }
 est_usd = 0.11
+usd_per_mtok = { text_input = 5, image_input = 8, image_output = 30 }   # the model page, read 2026-10-31;
+                            # each record's usage is priced at these into its usd
 terms = "OpenAI Services Agreement: the customer owns the output (openai.com/policies/services-agreement)."
 
 [prompt]

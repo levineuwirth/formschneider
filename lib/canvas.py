@@ -36,17 +36,31 @@ def layout(box: tuple[int, int], size: tuple[int, int]) -> Layout:
 
 
 def letter_canvas(path: Path, box: tuple[int, int], size: tuple[int, int],
-                  grow: float) -> tuple[Image.Image, np.ndarray, Layout]:
+                  grow: float, fill: bool = False) -> tuple[Image.Image, np.ndarray, Layout]:
     """The letter, black on white, on the canvas; and where a model may
-    draw (True), which is everywhere but the letter and its halo."""
+    draw (True), which is everywhere but the letter and its halo, and with
+    `fill` nowhere outside the block either, since that is cropped away."""
     lay = layout(box, size)
     x0, y0, x1, y1 = lay.block
     letter = rasterize(bare_svg(path, box), x1 - x0).resize((x1 - x0, y1 - y0))
     canvas = Image.new("L", size, 255)
     canvas.paste(letter, (x0, y0))
     px = grow * (x1 - x0) / box[0]
-    kept = distance_transform_edt(~ink(canvas)) <= px
-    return canvas, ~kept, lay
+    editable = ~(distance_transform_edt(~ink(canvas)) <= px)
+    if fill:
+        inside = np.zeros_like(editable)
+        inside[y0:y1, x0:x1] = True
+        editable &= inside
+    return canvas, editable, lay
+
+
+def halo_view(canvas: Image.Image, editable: np.ndarray) -> Image.Image:
+    """Where the model may draw, for the eye: white where it may, the letter
+    black, and what is kept white but not the letter (the halo, and any
+    margin outside the block) in red."""
+    rgb = np.stack([np.asarray(canvas.convert("L"))] * 3, -1)
+    rgb[~editable & (np.asarray(canvas.convert("L")) >= 128)] = (220, 60, 60)
+    return Image.fromarray(rgb, "RGB")
 
 
 def put_back(output: Image.Image, canvas: Image.Image, editable: np.ndarray,

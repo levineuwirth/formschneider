@@ -12,6 +12,7 @@ to fit stays visible. The author reviews each fitted cut against the
 fixed one, and may take a tighter tolerance, over budget, when smoothing
 damages the drawing."""
 
+import numpy as np
 from PIL import Image
 
 from initial import measure
@@ -33,6 +34,20 @@ DISPLAY_PX = 91.08
 def threshold(gray: Image.Image) -> Image.Image:
     t = otsu(gray) * 255
     return gray.point(lambda v: 0 if v < t else 255)
+
+
+def crop_to_ink(gray: Image.Image, least: float = 0.005) -> Image.Image:
+    """The picture cut down to its ink, as EB Garamond Initials' boxes are
+    their glyphs' bounds: a whole initial is drawn with whatever margin the
+    model leaves (about 5% a side in the OpenAI pilot), which would otherwise
+    sit inside its box. A row or column counts as ink when at least `least`
+    of it is, so a stray speck does not hold the margin open."""
+    g = gray.convert("L")
+    a = np.asarray(g) <= round(otsu(g) * 255)   # Otsu's ink class is at or below its level
+    rows, cols = np.flatnonzero(a.mean(1) >= least), np.flatnonzero(a.mean(0) >= least)
+    if not len(rows) or not len(cols):
+        return gray
+    return gray.crop((int(cols[0]), int(rows[0]), int(cols[-1]) + 1, int(rows[-1]) + 1))
 
 
 def traced(gray: Image.Image) -> tuple[Path, tuple[int, int]]:

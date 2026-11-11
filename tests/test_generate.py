@@ -332,3 +332,78 @@ def test_a_picture_that_is_not_the_recorded_one_is_refused(spec):
     Image.new("L", (256, 256), 0).save(root / "out/runs/t" / rec["output"]["file"])
     with pytest.raises(SystemExit):
         run.finish(spec, root)
+
+
+def test_a_wide_block_fills_its_canvas_when_the_spec_says_so(spec):
+    spec, root = spec
+    spec["routes"], spec["letters"], spec["attempts"] = ["ornament"], "W", 1
+    job = run.plan(spec)[0]
+    req, lay = run.request(spec, job, [])
+    assert lay.block[0] > 0 and req.editable[:, 0].all()   # unfilled: an editable margin
+    spec["letter"]["fill"] = True
+    req, lay = run.request(spec, job, [])
+    assert lay.block == (0, 0, 384, 256) and lay.box == (1500, 1000)
+    run.execute(spec, {"fake": fake_adapter}, go=True, root=root, log=quiet)
+    (rec,) = saved(spec, root)
+    assert rec["inputs"]["fill"] is True and rec["inputs"]["box"] == [1500, 1000]
+    assert run.letter_outline(root / "out/runs/t", rec, (1000, 667))   # redrawn as sent
+
+
+def test_a_margin_outside_the_block_is_not_drawn_in_when_filling():
+    path, box = capital(SPECTRAL.format(weight="SemiBold"), "W")
+    _, editable, lay = letter_canvas(path, box, (384, 256), grow=10, fill=True)
+    x0, _, x1, _ = lay.block
+    assert x0 > 0 and not editable[:, :x0].any() and not editable[:, x1:].any()
+    assert editable[:, x0:x1].any()
+
+
+def test_a_whole_initial_is_cropped_to_its_ink_when_the_run_says_so(spec):
+    spec, root = spec
+    spec["routes"], spec["letters"], spec["attempts"] = ["whole"], "F", 1
+    spec["finish"] = {"crop": "ink"}
+
+    def framed(model, **params):
+        def draw(req):
+            pic = Image.new("L", req.size, 255)
+            block = Image.new("L", (200, 200), 0)
+            block.paste(255, (60, 60, 140, 140))   # a block with a white counter
+            pic.paste(block, (28, 28))
+            pic.putpixel((2, 2), 0)   # a speck in the margin holds nothing open
+            return Result(png(pic), request_id="req_fake", seconds=0.0, usage=None)
+        return draw
+    run.execute(spec, {"fake": framed}, go=True, root=root, log=quiet)
+    (rec,) = saved(spec, root)
+    assert rec["crop"] == "ink"
+    assert run.picture(root / "out/runs/t", rec).size == (200, 200)
+    (row,) = run.finish(spec, root)
+    assert row["box"] == [1000, 1000]
+    assert "cropped to its ink" in (root / "out/runs/t/finished" / f"{rec['id']}.svg").read_text()
+
+
+def test_a_request_records_its_code_seed_rates_and_cost(spec):
+    spec, root = spec
+    spec["routes"], spec["letters"], spec["attempts"] = ["whole"], "F", 1
+    spec["model"][0]["usd_per_mtok"] = {"text_input": 5, "image_input": 8, "image_output": 30}
+
+    def priced(model, **params):
+        draw = fake_adapter(model, **params)
+
+        def call(req):
+            res = draw(req)
+            res.usage = {"input_tokens_details": {"text_tokens": 200, "image_tokens": 6000},
+                         "output_tokens_details": {"text_tokens": 0, "image_tokens": 2000}}
+            return res
+        return call
+    run.execute(spec, {"fake": priced}, go=True, root=root, log=quiet)
+    (rec,) = saved(spec, root)
+    assert rec["usd"] == pytest.approx(0.001 + 0.048 + 0.06)
+    assert rec["seed"] is None and len(rec["code"]["commit"]) == 40
+    assert isinstance(rec["code"]["dirty"], bool) and "packages" in rec["code"]
+    assert run.usd({"output_tokens_details": {"text_tokens": 5}}, {"image_output": 30}) is None
+
+
+def test_the_credit_reads_as_words():
+    r = {"model": "m", "provider": "p", "route": "whole", "letter": "F", "id": "x",
+         "at": {"sent": "2026-11-11T00:00:00+00:00"}, "terms": "T."}
+    c = run.credit({"name": "t"}, r)
+    assert "Cut: width 2048, median 3, speck 20, tolerance 2." in c and "{" not in c

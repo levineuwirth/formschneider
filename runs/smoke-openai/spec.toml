@@ -1,0 +1,34 @@
+# The first picture: one request sent on 2026-10-30 to see that the key and
+# the model answered, before the runner existed. It went to the generations
+# endpoint with no references and no canvas, and came back on a black ground.
+# It was kept in out/smoke/ only; records.jsonl here was written from that
+# file, out/smoke/smoke-F.json, on 2026-11-11, and its "sent" time is the
+# provider's `created`, since no send was logged at the time. Nothing here is
+# a result. Nothing more will be sent for this run.
+
+letters = "F"
+attempts = 1
+routes = ["whole"]
+idiom = "rinceau"
+max_requests = 1
+
+[letter]                    # unused: no ornament route
+weight = "SemiBold"
+cap = 0.82
+grow = 10
+
+[refs]
+letters = ""
+
+[[model]]
+provider = "openai"
+model = "gpt-image-2.5-sunburst"        # the undated name, as sent
+name = "sunburst"
+sizes = [[1024, 1024]]
+params = { quality = "low" }
+usd_per_mtok = { text_input = 5, image_input = 8, image_output = 30 }   # the model page, read 2026-10-31
+terms = "OpenAI Services Agreement: the customer owns the output (openai.com/policies/services-agreement)."
+
+[prompt]
+whole = "A sixteenth-century French woodcut ornamental initial: the capital letter F in a square block of black vine scrolls (rinceau) on white paper, one color, black ink only."
+ornament = ""

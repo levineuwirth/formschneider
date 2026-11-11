@@ -33,6 +33,7 @@ import io
 import json
 import math
 import os
+import subprocess
 import tomllib
 import uuid
 import zlib
@@ -43,8 +44,8 @@ import numpy as np
 from PIL import Image
 
 from bench import contact
-from canvas import Layout, letter_canvas, png, put_back, references
-from finish import BUDGET, FINISH, fitted, measures, traced
+from canvas import Layout, halo_view, letter_canvas, png, put_back, references
+from finish import BUDGET, FINISH, crop_to_ink, fitted, measures, traced
 from fonts import EBGI, SPECTRAL
 from initial import initial_svg, measure
 from letter import capital
@@ -136,6 +137,47 @@ def _kept(out: File, digest: str) -> Image.Image:
     return Image.open(f)
 
 
+def _code() -> dict:
+    """Which code made the request: the commit, whether the tree had changes
+    not in it, and the versions of the providers' client libraries."""
+    from importlib import metadata
+
+    def git(*a):
+        r = subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True)
+        return r.stdout.strip() if r.returncode == 0 else None
+    packages = {}
+    for p in ("openai", "fal-client", "httpx"):
+        try:
+            packages[p] = metadata.version(p)
+        except metadata.PackageNotFoundError:
+            pass
+    status = git("status", "--porcelain", "--untracked-files=no")
+    return {"commit": git("rev-parse", "HEAD"), "dirty": None if status is None else bool(status),
+            "packages": packages}
+
+
+# where each kind of token is in a usage, for a model priced per million tokens
+_TOKENS = {"text_input": ("input_tokens_details", "text_tokens"),
+           "image_input": ("input_tokens_details", "image_tokens"),
+           "text_output": ("output_tokens_details", "text_tokens"),
+           "image_output": ("output_tokens_details", "image_tokens")}
+
+
+def usd(usage: dict | None, rates: dict | None) -> float | None:
+    """What a request cost by its usage at the rates the spec records (USD
+    per million tokens), or None when either is missing or a kind of token
+    used has no rate."""
+    if not usage or not rates:
+        return None
+    total = 0.0
+    for kind, (group, key) in _TOKENS.items():
+        n = (usage.get(group) or {}).get(key) or 0
+        if n and kind not in rates:
+            return None
+        total += n * rates.get(kind, 0) / 1e6
+    return round(total, 6)
+
+
 def _model(spec: dict, job: Job) -> dict:
     return next(m for m in spec["model"] if m["model"] == job.model and m["provider"] == job.provider)
 
@@ -148,6 +190,12 @@ def request(spec: dict, job: Job, refs: list) -> tuple[Request, Layout | None]:
     # the provider's size nearest the block's shape, so a wide letter's
     # block is drawn wide and not cropped out of a square
     size = tuple(min(m["sizes"], key=lambda s: abs(math.log(s[0] / s[1] * box[1] / box[0]))))
+    fill = k.get("fill", False)
+    if fill and size[0] * box[1] > size[1] * box[0]:
+        # the block widened to the canvas, so the model's ornament runs to the
+        # canvas's edges and none of it is cropped off at the block's
+        path, box = capital(SPECTRAL.format(weight=k["weight"]), job.letter, cap=k["cap"],
+                            width=round(box[1] * size[0] / size[1]))
     prompt = spec["prompt"][job.route].format(letter=job.letter)
     # a model that takes few images takes the first references, the canvas
     # counting as one; a seed follows from the job, so a retry repeats it
@@ -155,7 +203,7 @@ def request(spec: dict, job: Job, refs: list) -> tuple[Request, Layout | None]:
     seed = zlib.crc32(job.id.encode()) & 0x7FFFFFFF if m.get("seeded") else None
     if job.route == "whole":
         return Request(prompt, size, refs=refs[:room], seed=seed), None
-    canvas, editable, lay = letter_canvas(path, box, size, k["grow"])
+    canvas, editable, lay = letter_canvas(path, box, size, k["grow"], fill)
     return Request(prompt, size, canvas, editable, refs[:room - 1], seed=seed), lay
 
 
@@ -210,13 +258,14 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
         req, _ = request(spec, j, refs)
         if req.image is not None:
             req.image.save(out / "inputs" / f"{j.letter}-canvas.png")
-            Image.fromarray(req.editable).save(out / "inputs" / f"{j.letter}-editable.png")
+            halo_view(req.image, req.editable).save(out / "inputs" / f"{j.letter}-halo.png")
         log(f"  {j.id}")
     if not go:
         log("planned only; nothing was sent (--go sends)")
         return todo
     (out / "images").mkdir(exist_ok=True)
-    callers = {}
+    callers, code = {}, _code()
+    crop = spec.get("finish", {}).get("crop")
     for j in todo:
         m = _model(spec, j)
         if (j.provider, j.model) not in callers:
@@ -228,12 +277,14 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
                        "editable": _keep(out, Image.fromarray(req.editable)),
                        "letter": f"Spectral {spec['letter']['weight']}",
                        "cap": spec["letter"]["cap"], "grow": spec["letter"]["grow"],
-                       "block": list(lay.block), "box": list(lay.box)}
+                       "block": list(lay.block), "box": list(lay.box),
+                       **({"fill": True} if spec["letter"].get("fill") else {})}
         key = uuid.uuid4().hex
         _log(spec, root, "sent", key, id=j.id, **asdict(j), run=spec["name"], prompt=req.prompt,
              size=list(req.size), params=m.get("params", {}), inputs=inputs,
-             terms=m.get("terms"), est_usd=m.get("est_usd"),
-             **({} if req.seed is None else {"seed": req.seed}))
+             terms=m.get("terms"), est_usd=m.get("est_usd"), usd_per_mtok=m.get("usd_per_mtok"),
+             seed=req.seed, code=code,
+             **({"crop": crop} if crop and j.route == "whole" else {}))
         try:
             res = callers[j.provider, j.model](req)
         except Exception as e:  # recorded, and the run stops: the next would likely fail too
@@ -244,7 +295,8 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
             _log(spec, root, "failed" if known else "unknown", key, error=fields)
             raise
         _log(spec, root, "returned", key, request_id=res.request_id, seconds=res.seconds,
-             usage=res.usage, meta=res.meta, bytes=len(res.png), sha256=_sha(res.png))
+             usage=res.usage, usd=usd(res.usage, m.get("usd_per_mtok")), meta=res.meta,
+             bytes=len(res.png), sha256=_sha(res.png))
         try:  # the bytes as they came, named for what they are: not every model can send a PNG
             pic = Image.open(io.BytesIO(res.png))
             name = f"images/{j.id}.{_EXTENSIONS.get(pic.format, pic.format.lower())}"
@@ -266,6 +318,10 @@ def picture(out: File, r: dict) -> Image.Image:
     if _sha(data) != r["output"]["sha256"]:
         raise SystemExit(f"{r['id']}: the picture is not the one the record says was made")
     gray = Image.open(io.BytesIO(data)).convert("L")
+    if r.get("crop") == "ink":
+        gray = crop_to_ink(gray)
+    elif r.get("crop"):
+        raise SystemExit(f"{r['id']}: no such crop as {r['crop']!r}")
     if r["route"] == "ornament":
         i = r["inputs"]
         canvas = _kept(out, i["canvas"]).convert("L")
@@ -286,10 +342,12 @@ def letter_outline(out: File, r: dict, box: tuple[int, int]) -> Path | None:
     family, weight = i["letter"].rsplit(" ", 1)
     if family != "Spectral":
         raise SystemExit(f"{r['id']}: no font for the kept letter {i['letter']}")
-    path, lbox = capital(SPECTRAL.format(weight=weight), r["letter"], height=i["box"][1], cap=i["cap"])
+    fill = i.get("fill", False)
+    path, lbox = capital(SPECTRAL.format(weight=weight), r["letter"], height=i["box"][1], cap=i["cap"],
+                         width=i["box"][0] if fill else 0)
     sent = np.asarray(_kept(out, i["canvas"]).convert("L"))
     free = np.asarray(_kept(out, i["editable"])).astype(bool)
-    again, editable, lay = letter_canvas(path, lbox, tuple(r["size"]), i["grow"])
+    again, editable, lay = letter_canvas(path, lbox, tuple(r["size"]), i["grow"], fill)
     if (list(lbox) != list(i["box"]) or list(lay.block) != list(i["block"])
             or not np.array_equal(np.asarray(again), sent) or not np.array_equal(editable, free)):
         raise SystemExit(f"{r['id']}: the kept letter drawn again is not the canvas sent "
@@ -342,4 +400,6 @@ def credit(spec: dict, r: dict, finish: dict = FINISH) -> str:
     what = (f"ornament drawn by {who} around {r['inputs']['letter']}'s capital "
             f"(SIL Open Font License 1.1)" if r["route"] == "ornament" else f"drawn by {who}")
     return (f"{r['letter']}, {what}; formschneider {spec['name']}/{r['id']}, "
-            f"{r['at']['sent'][:10]}. {r.get('terms') or ''} Cut: {finish}.").replace("--", "–")
+            f"{r['at']['sent'][:10]}. {r.get('terms') or ''} "
+            f"Cut: {', '.join(f'{k} {v}' for k, v in finish.items())}"
+            f"{', cropped to its ink' if r.get('crop') == 'ink' else ''}.").replace("--", "–")

@@ -19,6 +19,10 @@ max_requests = 300          # 288 planned, and room for a few that fail
 weight = "SemiBold"
 cap = 0.82
 grow = 10
+fill = true                 # a wide letter's block widened to its canvas, so no ornament is cropped off
+
+[finish]
+crop = "ink"                # a whole initial cut to its ink, as the ornament route is to its block
 
 [refs]                      # as in the pilot: none of the trial's six letters
 letters = "DGLNQT"
@@ -30,6 +34,8 @@ name = "sunburst"
 sizes = [[1024, 1024], [1536, 1024]]
 params = { quality = "high" }
 est_usd = 0.105             # what the pilot came to, per request
+usd_per_mtok = { text_input = 5, image_input = 8, image_output = 30 }   # the model page, read 2026-10-31;
+                            # each record's usage is priced at these into its usd
 terms = "OpenAI Services Agreement: the customer owns the output (openai.com/policies/services-agreement)."
 
 [[model]]

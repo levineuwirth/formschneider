@@ -80,9 +80,13 @@ request in a run goes to the same one. `records.jsonl` is an append-only
 log of each request's events:
 
 - **sent:** written to disk before the request goes out, with the prompt,
-  the settings, a checksum of every input, the terms and the time;
-- **returned:** the request id, usage, and the checksum of what came
-  back, written before the picture is touched;
+  the settings, the seed (null for a model that takes none), a checksum of
+  every input, the terms, the prices the spec records, the commit and
+  client libraries that sent it (and whether the tree had changes not
+  committed), and the time;
+- **returned:** the request id, usage, its cost at those prices where a
+  model is priced by the token, and the checksum of what came back,
+  written before the picture is touched;
 - **saved:** the picture written and read back;
 - **failed:** the provider answered with an error: its class, status,
   request id and provider code, but never its message, which can name an
@@ -107,10 +111,18 @@ be checked against git.
   canvas of the provider's size, and the model may draw everywhere but the
   letter and a thin halo around it. Some providers honor a mask only
   loosely, so the letter and halo are put back from the canvas afterwards.
+  With `fill` (the matched run), a wide letter's block is widened to its
+  canvas (W's to 1500 × 1000 on 1536 × 1024), so the ornament a model draws
+  to the canvas's edges is not cropped off at the block's. The plan writes
+  `LETTER-halo.png` beside each canvas: the letter, and in red what is kept
+  white around it.
 - **References:** EB Garamond Initials' D, G, L, N, Q and T, none of the
   trial's letters, so no reference can be copied.
 - **Finishing:** every picture gets the same fixed finishing, the setting
-  fixed on the scans before any generated picture was seen.
+  fixed on the scans before any generated picture was seen. With
+  `[finish] crop = "ink"` (the matched run, recorded with each request),
+  a whole initial is first cut to its ink, as the ornament route is cut to
+  its block: the pilot's whole initials left about 5% white on every side.
 - **Providers:** OpenAI directly, and through fal.ai the endpoints
   `lib/fal_images.py` knows, each with its own way of taking images and a
   size. fal's queue is called over plain HTTP, refusing its retries and its
@@ -125,6 +137,10 @@ bin/finish pilot-openai          # put back, cut, measure: out/runs/pilot-openai
 bin/archive pilot-openai         # pictures, inputs and record in one checked archive
 bin/curate pilot-openai          # a curation page to publish: keep or reject each, judge each set
 ```
+
+`runs/smoke-openai` is the first picture: one request of 2026-10-30, made
+before the runner existed, its record written afterwards from the note kept
+with it.
 
 ## Running
 
