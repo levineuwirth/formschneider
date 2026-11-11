@@ -14,6 +14,12 @@ class Request:
     image: Image.Image | None = None        # the canvas, for the ornament-only route
     editable: np.ndarray | None = None      # where the model may draw on it
     refs: list[tuple[str, Image.Image]] = field(default_factory=list)
+    seed: int | None = None                 # for a model that takes one
+
+
+class NotSent(Exception):
+    """The request never reached the provider (an upload failed, or the
+    provider could not take it), so it cannot have been done or billed."""
 
 
 @dataclass

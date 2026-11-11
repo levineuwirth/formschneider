@@ -1,0 +1,40 @@
+# Does rewording the ornament-only prompt help, before every model is given it?
+# The pilot's faults: nearly empty counters on the O, and a letter redrawn
+# heavier, which leaves a band when the kept letter is put back. O, S and W,
+# which showed them, four attempts each, by the pilot's model and against the
+# pilot's pictures. Nothing here is a result. Nothing has been sent.
+
+letters = "OSW"
+attempts = 4
+routes = ["ornament"]
+idiom = "rinceau"
+max_requests = 15
+
+[letter]
+weight = "SemiBold"
+cap = 0.82
+grow = 10
+
+[refs]
+letters = "DGLNQT"
+
+[[model]]
+provider = "openai"
+model = "gpt-image-2.5-sunburst-2026-09-08"
+name = "sunburst"
+sizes = [[1024, 1024], [1536, 1024]]
+params = { quality = "high" }
+est_usd = 0.11
+terms = "OpenAI Services Agreement: the customer owns the output (openai.com/policies/services-agreement)."
+
+[prompt]
+ornament = """\
+The first image is a woodcut ornamental initial in which only the capital \
+letter {letter} has been cut. Fill all the empty white space with vine scrolls \
+(rinceau) of curling stems, leaves and small flowers, cut as solid black shapes \
+on an open white ground and filling the picture evenly, in the style of the \
+other images. Fill the spaces enclosed by the letter as well, as densely as the \
+rest. The letter stays exactly as it is: do not redraw, thicken, outline or \
+double it, and keep a thin white gap around it. Draw no letters, words or frame. \
+Black ink on white only, crisp flat edges: no paper texture, no shading, no \
+hatching, no gray."""

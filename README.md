@@ -111,6 +111,12 @@ be checked against git.
   trial's letters, so no reference can be copied.
 - **Finishing:** every picture gets the same fixed finishing, the setting
   fixed on the scans before any generated picture was seen.
+- **Providers:** OpenAI directly, and through fal.ai the endpoints
+  `lib/fal_images.py` knows, each with its own way of taking images and a
+  size. fal's queue is called over plain HTTP, refusing its retries and its
+  fallbacks to other endpoints, because fal's client library retries on its
+  own with no way to turn that off. fal has no dated snapshots of its models,
+  so the date in the record is all that says which version answered.
 
 ```sh
 bin/generate pilot-openai        # plan only: what would be sent, and its inputs in out/
@@ -134,7 +140,7 @@ make test        # the cut against known outlines
 make calibrate   # out/calibrate/: results.md, results.json, sheet.png, svg/
 bin/corpus fetch # the scans corpus/scans.json records, into out/corpus/
 make scans       # out/scans/: the same, for the scans
-uv run --extra openai bin/generate NAME   # see Generating
+uv run --extra openai --extra fal bin/generate NAME   # see Generating
 ```
 
 ## CI

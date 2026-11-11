@@ -1,0 +1,107 @@
+# The matched run, rinceau: every model given the same letters, attempts,
+# routes, prompts and references, as far as it can take them, and all
+# finished alike. Models that cannot take this job (references and a canvas)
+# are not here: Recraft V4 and Ideogram 4 take text alone on fal, and FLUX.1
+# Fill takes no references; open models come in a run of their own.
+#
+# The endpoints and prices were read from fal's pages on 2026-11-03. Only
+# OpenAI's model is a dated snapshot; fal's have no snapshots to pin, so the
+# date in each record is all that says which version answered, and the
+# models should be run in one sitting. Nothing has been sent.
+
+letters = "AFIOSW"
+attempts = 4
+routes = ["whole", "ornament"]
+idiom = "rinceau"
+max_requests = 300          # 288 planned, and room for a few that fail
+
+[letter]                    # the kept capital, for the ornament-only route
+weight = "SemiBold"
+cap = 0.82
+grow = 10
+
+[refs]                      # as in the pilot: none of the trial's six letters
+letters = "DGLNQT"
+
+[[model]]
+provider = "openai"
+model = "gpt-image-2.5-sunburst-2026-09-08"
+name = "sunburst"
+sizes = [[1024, 1024], [1536, 1024]]
+params = { quality = "high" }
+est_usd = 0.105             # what the pilot came to, per request
+terms = "OpenAI Services Agreement: the customer owns the output (openai.com/policies/services-agreement)."
+
+[[model]]
+provider = "fal"
+model = "google/nano-banana-2.1/edit"   # released 2026-10-06; Gemini; no mask
+name = "nanobanana21"
+sizes = [[1024, 1024], [1536, 1024]]    # sent as 1:1 and 3:2 at 1K, about 1 MP
+seeded = true
+params = { resolution = "1K", output_format = "png" }
+# billed by tokens: $0.044 for a 1K edit with two inputs, by fal's page; a
+# guess for seven. The billing record is the truth.
+est_usd = 0.06
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[[model]]
+provider = "fal"
+model = "blackforestlabs/flux-3/edit-image"   # no mask; takes no seed
+name = "flux3"
+sizes = [[1024, 1024], [1536, 1024]]    # sent as 1:1 and 3:2 at 1k, about 1 MP
+params = { resolution = "1k", output_format = "png", enable_prompt_expansion = false }
+est_usd = 0.048             # flat at 1 MP, whatever the number of references
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[[model]]
+provider = "fal"
+model = "bytedance/seedream/v5/pro/edit"   # no mask; takes no seed
+name = "seedream5"
+sizes = [[1024, 1024], [1536, 1024]]
+# its prompt optimization has no off setting; "standard" is the default
+params = { output_format = "png", watermark = false, num_images = 1 }
+est_usd = 0.095             # $0.0675 up to 1536 x 1536 + $0.0045 per input after the first ("tentative")
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[[model]]
+provider = "fal"
+model = "alibaba/qwen-image-3/edit"     # no mask
+name = "qwen3"
+sizes = [[1024, 1024], [1536, 1024]]
+max_images = 3              # the endpoint's limit: D, G, L; or the canvas with D and G
+seeded = true
+params = { enable_prompt_expansion = false, output_format = "png", num_images = 1 }
+est_usd = 0.075             # fal's pages disagree: $0.04 at 1K or $0.075
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[[model]]
+provider = "fal"
+model = "fal-ai/ideogram/v3"            # with a canvas, fal-ai/ideogram/v3/edit and a mask
+name = "ideogram3"
+sizes = [[1024, 1024], [1536, 1024]]
+seeded = true
+params = { rendering_speed = "QUALITY", enable_prompt_expansion = false, num_images = 1 }
+est_usd = 0.09
+terms = "Through fal.ai (fal.ai/terms): commercial use per the model's page, as of 2026-11-03."
+
+[prompt]
+# The pilot's words. The ornament prompt may change with what
+# pilot-ornament-prompt shows, before anything here is sent.
+whole = """\
+A woodcut ornamental initial as printed in France in the sixteenth century: \
+the capital letter {letter}, large and centered in a block that fills the \
+picture, among vine scrolls (rinceau) of curling stems, leaves and small \
+flowers, cut as solid black shapes on an open white ground. Black ink on \
+white only: the ground is white, never black. No frame or border. No other \
+letters or words anywhere. Crisp, flat black edges: no paper texture, no \
+shading, no hatching, no gray. The reference images show the style to \
+follow; take their ornament, not their letters."""
+ornament = """\
+The first image is a woodcut ornamental initial in which only the capital \
+letter {letter} has been cut. Fill the empty white space around the letter \
+with vine scrolls (rinceau) of curling stems, leaves and small flowers, cut \
+as solid black shapes on an open white ground and filling the picture \
+evenly, in the style of the other images. Leave the letter exactly as it is, \
+with a thin white gap around it. Draw no letters, words or frame. Black ink \
+on white only, crisp flat edges: no paper texture, no shading, no hatching, \
+no gray."""

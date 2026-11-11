@@ -12,10 +12,11 @@ sent and never heard of again stops the run until the author has checked
 the provider's usage and passes --abandon, which records that decision;
 so does one that ended in a timeout or a lost connection.
 
-Usage: uv run --extra openai bin/generate NAME [--go] [--limit N] [--abandon]
+Usage: uv run --extra openai --extra fal bin/generate NAME [--go] [--limit N] [--abandon]
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path as File
 
@@ -30,7 +31,13 @@ def openai_images(model, **params):
     return OpenAIImages(model, **params)
 
 
-ADAPTERS = {"openai": openai_images}
+def fal_images(model, **params):
+    from fal_images import FalImages
+    return FalImages(model, **params)
+
+
+ADAPTERS = {"openai": openai_images, "fal": fal_images}
+KEYS = {"openai": "OPENAI_API_KEY", "fal": "FAL_KEY"}
 
 
 def main() -> None:
@@ -43,7 +50,16 @@ def main() -> None:
     a = ap.parse_args()
     if a.go:
         print("keys from .env:", ", ".join(env.load(ROOT / ".env")) or "none")
-    run.execute(run.load(a.name), ADAPTERS, go=a.go, limit=a.limit, abandon=a.abandon)
+    spec = run.load(a.name)
+    providers = {m["provider"] for m in spec["model"]}
+    if "fal" in providers:
+        from fal_images import check
+        for m in (m for m in spec["model"] if m["provider"] == "fal"):
+            check(m, len(spec["refs"]["letters"]))
+    # every key before the first request, so a run does not stop for one partway
+    if a.go and (missing := [KEYS[p] for p in sorted(providers) if not os.environ.get(KEYS[p])]):
+        sys.exit(f"not in .env or the environment: {', '.join(missing)}")
+    run.execute(spec, ADAPTERS, go=a.go, limit=a.limit, abandon=a.abandon)
 
 
 if __name__ == "__main__":

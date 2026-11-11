@@ -35,6 +35,7 @@ import math
 import os
 import tomllib
 import uuid
+import zlib
 from dataclasses import asdict, dataclass
 from pathlib import Path as File
 
@@ -47,7 +48,7 @@ from finish import BUDGET, FINISH, fitted, measures, traced
 from fonts import EBGI, SPECTRAL
 from initial import initial_svg, measure
 from letter import capital
-from model import Request, error_fields
+from model import NotSent, Request, error_fields
 from paths import Path, fmt
 from raster import bare_svg, rasterize
 from simplify import simplify
@@ -110,6 +111,9 @@ def _log(spec: dict, root: File, event: str, request: str, **fields) -> None:
         os.fsync(f.fileno())
 
 
+_EXTENSIONS = {"JPEG": "jpg"}
+
+
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -145,10 +149,14 @@ def request(spec: dict, job: Job, refs: list) -> tuple[Request, Layout | None]:
     # block is drawn wide and not cropped out of a square
     size = tuple(min(m["sizes"], key=lambda s: abs(math.log(s[0] / s[1] * box[1] / box[0]))))
     prompt = spec["prompt"][job.route].format(letter=job.letter)
+    # a model that takes few images takes the first references, the canvas
+    # counting as one; a seed follows from the job, so a retry repeats it
+    room = m.get("max_images", 1 + len(refs))
+    seed = zlib.crc32(job.id.encode()) & 0x7FFFFFFF if m.get("seeded") else None
     if job.route == "whole":
-        return Request(prompt, size, refs=refs), None
+        return Request(prompt, size, refs=refs[:room], seed=seed), None
     canvas, editable, lay = letter_canvas(path, box, size, k["grow"])
-    return Request(prompt, size, canvas, editable, refs), lay
+    return Request(prompt, size, canvas, editable, refs[:room - 1], seed=seed), lay
 
 
 def _reconcile(spec: dict, root: File, out: File) -> None:
@@ -156,11 +164,14 @@ def _reconcile(spec: dict, root: File, out: File) -> None:
     in between) is marked saved if its picture is on disk and is the one
     returned; otherwise it stays as it is, accounted for and not done."""
     for key, r in requests(spec, root).items():
-        f = out / "images" / f"{r['id']}.png"
-        if r["state"] == "returned" and f.exists() and _sha(f.read_bytes()) == r["sha256"]:
-            _log(spec, root, "saved", key, output={"file": f"images/{r['id']}.png",
-                                                   "sha256": r["sha256"],
-                                                   "size": list(Image.open(f).size)})
+        if r["state"] != "returned":
+            continue
+        for f in sorted((out / "images").glob(f"{r['id']}.*")):
+            if _sha(f.read_bytes()) == r["sha256"]:
+                _log(spec, root, "saved", key, output={"file": f"images/{f.name}",
+                                                       "sha256": r["sha256"],
+                                                       "size": list(Image.open(f).size)})
+                break
 
 
 def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = None,
@@ -211,7 +222,7 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
         if (j.provider, j.model) not in callers:
             callers[j.provider, j.model] = adapters[j.provider](j.model, **m.get("params", {}))
         req, lay = request(spec, j, refs)
-        inputs = {"refs": {n: _keep(out, i) for n, i in refs}}
+        inputs = {"refs": {n: _keep(out, i) for n, i in req.refs}}
         if req.image is not None:
             inputs |= {"canvas": _keep(out, req.image),
                        "editable": _keep(out, Image.fromarray(req.editable)),
@@ -221,26 +232,28 @@ def execute(spec: dict, adapters: dict, go: bool = False, limit: int | None = No
         key = uuid.uuid4().hex
         _log(spec, root, "sent", key, id=j.id, **asdict(j), run=spec["name"], prompt=req.prompt,
              size=list(req.size), params=m.get("params", {}), inputs=inputs,
-             terms=m.get("terms"), est_usd=m.get("est_usd"))
+             terms=m.get("terms"), est_usd=m.get("est_usd"),
+             **({} if req.seed is None else {"seed": req.seed}))
         try:
             res = callers[j.provider, j.model](req)
         except Exception as e:  # recorded, and the run stops: the next would likely fail too
             # an HTTP status means the provider answered; anything else (a
             # timeout, a lost connection) leaves the outcome unknown
             fields = error_fields(e)
-            _log(spec, root, "failed" if "status" in fields else "unknown", key, error=fields)
+            known = "status" in fields or isinstance(e, NotSent)
+            _log(spec, root, "failed" if known else "unknown", key, error=fields)
             raise
         _log(spec, root, "returned", key, request_id=res.request_id, seconds=res.seconds,
              usage=res.usage, meta=res.meta, bytes=len(res.png), sha256=_sha(res.png))
-        try:
-            f = out / "images" / f"{j.id}.png"
-            f.write_bytes(res.png)
-            size = Image.open(io.BytesIO(res.png)).size
+        try:  # the bytes as they came, named for what they are: not every model can send a PNG
+            pic = Image.open(io.BytesIO(res.png))
+            name = f"images/{j.id}.{_EXTENSIONS.get(pic.format, pic.format.lower())}"
+            (out / name).write_bytes(res.png)
         except Exception as e:
             _log(spec, root, "failed", key, error=error_fields(e))
             raise
-        _log(spec, root, "saved", key, output={"file": f"images/{j.id}.png",
-                                               "sha256": _sha(res.png), "size": list(size)})
+        _log(spec, root, "saved", key, output={"file": name, "sha256": _sha(res.png),
+                                               "size": list(pic.size)})
         log(f"  {j.id}: saved, {res.seconds}s")
     return todo
 
